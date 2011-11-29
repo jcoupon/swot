@@ -2,6 +2,8 @@
 swot (Super W Of Theta)  mpi version                                     
 -------------------------------------------------------------------------
 
+Nov 29, 2011
+
 Program to compute two-point correlation functions. Supports	
 auto and cross correlations and galaxy-galaxy lensing.
 
