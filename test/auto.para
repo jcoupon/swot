@@ -1,0 +1,25 @@
+#Configuration file for swot
+#----------------------------------------------------------#
+#Input catalogues                                          #
+#----------------------------------------------------------#
+data1          test/data1.cat  #input data catalogue #1
+cols1          1,2	  #Column ids for data1
+ran1           test/ran1.cat	  #input random catalogue #1
+rancols1       1,2	  #Column ids for ran1
+coord          RADEC	  #Coordinates: RADEC (in deg) or CART
+#----------------------------------------------------------#
+#Correlation options                                       #
+#----------------------------------------------------------#
+corr           auto	 #Type of correlation: auto, cross or gglens
+est            ls	 #Estimator: ls, nat, ham
+range          0.0001,1	 #Correlation range
+nbins          20	 #Number of bins
+log            yes	 #Logarithmic bins (yes or no)
+nboots         0	 #Number of bootstrap samples
+OA             0.05	 #Open angle for approximation
+#----------------------------------------------------------#
+#Output options                                            #
+#----------------------------------------------------------#
+out            corr.out	 #Output file: coord corr(coord) corr_err
+cov            no	 #Covariance matrix of bootstrap errors (yes or no)
+cov_out        cov.out	 #Covariance output file

@@ -21,6 +21,17 @@ in the input catalogues must be in decimal degrees.
 Output format: coord corr(coord) corr_err + [pair_numbers]
 
 -------------------------------------------------------------------------
+swot (Super W Of Theta)  mpi version                                     
+-------------------------------------------------------------------------
+
+* w(theta):
+swot -c test/auto.para
+
+* Gal-gal lensing
+swot -c test/gglens.para
+
+
+-------------------------------------------------------------------------
 Options
 -------------------------------------------------------------------------
 
