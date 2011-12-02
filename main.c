@@ -6,6 +6,14 @@
 Program to compute two-point correlation functions. Supports	
 auto and cross correlations. 
 
+TO DO:
+
+- reduce memory usage: create "light" node if rmax/dmax = OA, 
+float for coordinates, warning in case of large cats?
+- merge option reading from command line and config file
+- option for physical coordinate
+
+
 Contributions:
 - The algorithm to compute the number of pairs from a tree is 
 based on Martin Kilbinger's Ahtena code:
@@ -14,6 +22,9 @@ http://www2.iap.fr/users/kilbinge/athena/
 Alexie Leauthaud's code 
 (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
 
+v 1.2 Dec 2011
+- added the option -proj to give physical projection 
+for w(R) and Delta sigma
 v 1.1 Nov 2011
 - added the photo-z error in input catalogue
 lensing signal is added for zs > zl + sigz(zl)+sigz(zs)
@@ -622,7 +633,8 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
   
   int i,n,k;
   
-  dA = dComo(lens.x[2],para->a);///(lens.x[2]+1.0);
+  dA = dComo(lens.x[2],para->a);
+  if(para->proj == COMO) dA /= (lens.x[2]+1.0);    /*comoving coordinates*/
   dR = d*dA*PI/180.0;
   if(para->log) dR = log(dR);
   k = floor((dR-para->min)/para->Delta);
@@ -645,12 +657,12 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
     e1         =  source.e1*cos2phi_gg + source.e2*sin2phi_gg;
     //e2         = -source.e1*sin2phi_gg + source.e2*cos2phi_gg;
     //Lens equation -----------------------------
-    DOS        = dComo(source.x[2],para->a);///(source.x[2]+1.0);
-    DOL        = dComo(lens.x[2],para->a);///(lens.x[2]+1.0);
-    DLS        = (dComo(source.x[2],para->a)-dComo(lens.x[2],para->a));///(source.x[2]+1.0);
-    SigCritInv = DOL*DLS/DOS/1000.0;//1/SigCrit in Gpc
-    //See Narayan & Bartelman pge 10 -------------
-    SigCritInv /= 1.663e3;
+    DOS        = dComo(source.x[2],para->a);
+    DOL        = dComo(lens.x[2],para->a);
+    if(para->proj == COMO) DOL /= (lens.x[2]+1.0); /*comoving coordinates. Cancels out for DOS/DOL.*/
+    DLS        = (dComo(source.x[2],para->a)-dComo(lens.x[2],para->a));
+    SigCritInv = DOL*DLS/DOS/1000.0;               /*1/SigCrit in Gpc*/
+    SigCritInv /= 1.663e3;                         /*See Narayan & Bartelman pge 10 */
     w = SigCritInv*SigCritInv*source.w;
     for(n=0;n<para->nboots+1;n++){
       weight[n+(para->nboots+1)*k]  += lens.boots[n]*w;
@@ -706,6 +718,7 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
     Npairs(para,node1,node2->Right, rank, size, 0, verbose);
   }else{
     if(para->log) d = log(d);
+    if(para->proj == PHYS)  d *= dComo(node1->point[0].x[2],para->a)*PI/180.0;  /*physical coordinate projection*/
     k = floor((d-para->min)/para->Delta);
     if(0 <= k && k < para->nbins){
       for(i=0;i<para->nboots+1;i++) NN[i+(para->nboots+1)*k] += fac*node1->N[i]*node2->N[i];
@@ -772,7 +785,7 @@ Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall){
     zmin = 99.0;
     zmax = -99.0;
     for(i=0;i<N;i++) {
-      result->point[0].sigz += 0.05/(double)N;//0.0*data[i].sigz/(double)N;
+      result->point[0].sigz += 0.05/(double)N;
       result->point[0].e1   += data[i].e1/(double)N;
       result->point[0].e2   += data[i].e2/(double)N;
       result->point[0].w    += data[i].w/(double)N;
@@ -865,6 +878,7 @@ int readPara(int argc, char **argv, Config *para){
   }
   para->coordType = RADEC;
   para->distAng   = &distAngSpher;
+  para->proj      = THETA;
   para->corr      = AUTO;
   para->estimator = LS;
   para->min       = 0.0001;
@@ -889,7 +903,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.1\n\n\
+                (Super W Of Theta) MPI version 1.2\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -923,13 +937,15 @@ Output format: coord corr(coord) corr_err\n",MYNAME,MYNAME);
       printf("log            yes\t #Logarithmic bins (yes or no)\n");
       printf("nboots         %d\t #Number of bootstrap samples\n",para->nboots);
       printf("OA             %g\t #Open angle for approximation\n",para->OA);
+      printf("proj           theta\t #Axis projection (or phys)\n");
       printf("#----------------------------------------------------------#\n");
-      printf("#Cosmology (for gal-gal correlations)                      #\n");
+      printf("#Cosmology (for gal-gal correlations) and w(R)             #\n");
       printf("#----------------------------------------------------------#\n");
       printf("H0             %g\t #Hubble parameter\n",para->a[0]);
       printf("Omega_M        %g\t #Relative matter density\n",para->a[1]);
       printf("Omega_L        %g\t #Relative energy density (Lambda)\n",para->a[2]);
       printf("sigz           %g\t #Redshift accuracy\n",para->sigz);
+      printf("#proj           como\t #Axis projection (or phys)\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Output options                                            #\n");
       printf("#----------------------------------------------------------#\n");
@@ -972,6 +988,11 @@ Output format: coord corr(coord) corr_err\n",MYNAME,MYNAME);
 	    if(!strcmp(getCharValue(item,2),"cross"))  para->corr = CROSS;
 	    if(!strcmp(getCharValue(item,2),"auto"))   para->corr = AUTO;
 	    if(!strcmp(getCharValue(item,2),"gglens")) para->corr = GGLENS;
+	  }
+	  if(!strcmp(getCharValue(item,1),"proj")) {
+	    if(!strcmp(getCharValue(item,2),"theta")) para->proj = THETA;
+	    if(!strcmp(getCharValue(item,2),"como"))   para->proj = COMO;
+	    if(!strcmp(getCharValue(item,2),"phys"))   para->proj = PHYS;
 	  }
 	  if(!strcmp(getCharValue(item,1),"est")) {
 	    if(!strcmp(getCharValue(item,2),"ls"))  para->estimator = LS;
@@ -1035,6 +1056,11 @@ Output format: coord corr(coord) corr_err\n",MYNAME,MYNAME);
       if(!strcmp(argv[i+1],"auto"))   para->corr = AUTO;
       if(!strcmp(argv[i+1],"gglens")) para->corr = GGLENS;
     }
+    if(!strcmp(argv[i],"-proj")) {
+      if(!strcmp(argv[i+1],"theta")) para->proj = THETA;
+      if(!strcmp(argv[i+1],"como"))  para->proj = COMO;
+      if(!strcmp(argv[i+1],"phys"))  para->proj = PHYS;
+    }
     if(!strcmp(argv[i],"-est")) {
       if(!strcmp(argv[i+1],"ls"))  para->estimator = LS;
       if(!strcmp(argv[i+1],"nat")) para->estimator = NAT;
@@ -1070,6 +1096,7 @@ Output format: coord corr(coord) corr_err\n",MYNAME,MYNAME);
   }
   
   if(para->corr == GGLENS) NDIM  = 3;
+  if(para->corr == GGLENS && para->proj == THETA)  para->proj = COMO; /*Default projection for gg lensing*/
 
   switch(para->coordType)
     {
@@ -1158,36 +1185,10 @@ void readCat(FILE *fileIn, int id[NIDS], double *data){
   return;
 }
 
-double distAngSpher(Point *a, Point *b){
-  /*Returns the distance between a and b. Spherical coordinates.*/
-  double sin2_ra = 0.5*(1.0 - a->cosx[0]*b->cosx[0] - a->sinx[0]*b->sinx[0]);
-  double sin2_dec = 0.5*(1.0 - a->cosx[1]*b->cosx[1] - a->sinx[1]*b->sinx[1]);
-  return 2.0*asin(sqrt(MAX(EPS,sin2_dec + a->cosx[1]*b->cosx[1]*sin2_ra)))*180/PI;
-}
-double distAngCart(Point *a, Point *b){
-  /*Returns the distance between a and b. Cartesian coordinates.*/
-  return sqrt((a->x[0]-b->x[0])*(a->x[0]-b->x[0]) + (a->x[1]-b->x[1])*(a->x[1]-b->x[1]));
-}
-
-int comparePoints(const void *a,const void *b){
-  /* Compares x0 coordinates of 2 points*/
- 
-  int SplitDim = (*(Point *)a).SplitDim;
-
-  if ((*(Point *)a).x[SplitDim] > (*(Point *)b).x[SplitDim])
-    return 1;
-  else if ((*(Point *)a).x[SplitDim] < (*(Point *)b).x[SplitDim])
-    return -1;
-  else 
-    return 0; 
-}
-
 Point *dataToPoint(Config para, double *data, int N){
   /*Transforms data into array with type "Point".*/    
   long i,j,k;
   Point *result = createPoint(N,para.nboots+1);
-  
-
   
 
   //Read file
@@ -1197,6 +1198,7 @@ Point *dataToPoint(Config para, double *data, int N){
     result[i].cosx  = (double *)malloc(2*sizeof(double));
     result[i].x[0]     = data[NIDS*i];
     result[i].x[1]     = data[NIDS*i+1]; 
+    if(para.proj == PHYS) result[i].x[2] = data[NIDS*i+2];
     if(para.corr == GGLENS){
       result[i].x[2]     = data[NIDS*i+2]; 
       result[i].sigz     = data[NIDS*i+3]; 
@@ -1223,6 +1225,30 @@ Point *dataToPoint(Config para, double *data, int N){
   }
   
   return result;
+}
+
+double distAngSpher(Point *a, Point *b){
+  /*Returns the distance between a and b. Spherical coordinates.*/
+  double sin2_ra = 0.5*(1.0 - a->cosx[0]*b->cosx[0] - a->sinx[0]*b->sinx[0]);
+  double sin2_dec = 0.5*(1.0 - a->cosx[1]*b->cosx[1] - a->sinx[1]*b->sinx[1]);
+  return 2.0*asin(sqrt(MAX(EPS,sin2_dec + a->cosx[1]*b->cosx[1]*sin2_ra)))*180/PI;
+}
+double distAngCart(Point *a, Point *b){
+  /*Returns the distance between a and b. Cartesian coordinates.*/
+  return sqrt((a->x[0]-b->x[0])*(a->x[0]-b->x[0]) + (a->x[1]-b->x[1])*(a->x[1]-b->x[1]));
+}
+
+int comparePoints(const void *a,const void *b){
+  /* Compares x0 coordinates of 2 points*/
+ 
+  int SplitDim = (*(Point *)a).SplitDim;
+
+  if ((*(Point *)a).x[SplitDim] > (*(Point *)b).x[SplitDim])
+    return 1;
+  else if ((*(Point *)a).x[SplitDim] < (*(Point *)b).x[SplitDim])
+    return -1;
+  else 
+    return 0; 
 }
 
 

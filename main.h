@@ -57,6 +57,10 @@ Critical density, z=0 :   1.43875e+11
 #define LS     0
 #define NAT    1
 #define HAM    2
+#define COMO   0
+#define THETA  1
+#define PHYS   2
+
 
 #define MAX(x,y) ((x) > (y)) ? (x) : (y)
 #define MIN(x,y) ((x) < (y)) ? (x) : (y)
@@ -101,6 +105,12 @@ typedef struct LightNode
 typedef struct Config
 {
   int cov_mat, nboots, estimator, nbins,corr, coordType, log;
+  
+  /*For gg lensing, default: comoving (COMO). 
+    For auto/cross, default: theta (THETA).
+    change to PHYS for physical coordinate*/
+  int proj;
+  
   double (*distAng)(Point *,Point *);
   double min, max, Delta, OA;
   char fileInName1[1000], fileInName2[1000];
