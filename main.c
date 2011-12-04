@@ -659,10 +659,10 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
     //Lens equation -----------------------------
     DOS        = dComo(source.x[2],para->a);
     DOL        = dComo(lens.x[2],para->a);
-    if(para->proj == COMO) DOL /= (lens.x[2]+1.0); /*comoving coordinates. Cancels out for DOS/DOL.*/
+    if(para->proj == COMO) DOL /= (lens.x[2]+1.0); /* comoving coordinates. Cancels out for DOS/DOL. */
     DLS        = (dComo(source.x[2],para->a)-dComo(lens.x[2],para->a));
-    SigCritInv = DOL*DLS/DOS/1000.0;               /*1/SigCrit in Gpc*/
-    SigCritInv /= 1.663e3;                         /*See Narayan & Bartelman pge 10 */
+    SigCritInv = DOL*DLS/DOS/1000.0;               /* 1/SigCrit in Gpc */
+    SigCritInv /= 1.663e3;                         /* see Narayan & Bartelman pge 10 */
     w = SigCritInv*SigCritInv*source.w;
     for(n=0;n<para->nboots+1;n++){
       weight[n+(para->nboots+1)*k]  += lens.boots[n]*w;
@@ -739,17 +739,17 @@ Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall){
   long i,j,Nmin = 1;
   static void *root;
   static long countNodes;
-  static Point *dataNode;
+  static Point *dataRoot, *workspace, *save;
   double zmin,zmax;
   
-  //Allocate memory for THIS node -------------
-  Node *result  = (Node *)malloc(sizeof(Node));
+  Node *result  = (Node *)malloc(sizeof(Node)); /* Allocate memory for THIS node */
   
-  //The root node contains all points
-  if(firstCall){
+  if(firstCall){                     
     root       = result;
     countNodes = 0;
-    dataNode   = createPoint(N,para.nboots+1);
+    workspace  = createPoint(N,para.nboots+1);
+    save       = createPoint(N,para.nboots+1); 
+    for(i=0;i<N;i++) cpyPoints(&save[i],&data[i]); /* Save data */
   }
   result->root = root;
   result->id   = countNodes;
@@ -794,7 +794,7 @@ Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall){
     }
     result->Deltaz = zmax - zmin;
   }
-   
+  
   //Node size
   result->radius = EPS;
   for(i=0;i<N;i++){
@@ -813,9 +813,11 @@ Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall){
     double SplitValue;
     long NLeft, NRight;
     
-    //Sort values along SplitDim coordinates
-    for(i=0;i<N;i++) data[i].SplitDim = SplitDim;
-    qsort(data,N,sizeof(Point),comparePoints);
+    for(i=0;i<N;i++){   /* sort values along SplitDim coordinates */
+      cpyPoints(&workspace[i], &data[i]);
+      workspace[i].SplitDim = SplitDim;
+    }
+    qsort(workspace,N,sizeof(Point),comparePoints);
     
     //Find SplitValue
     switch(PARITY(N)){
@@ -834,16 +836,18 @@ Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall){
     if(SplitDim > NDIM-1)  SplitDim = 0;
   
     //Left ----------------------------------------------------
-    for(i=0;i<NLeft;i++) cpyPoints(&dataNode[i], &data[i]);
-    result->Left = createNode(para,dataNode,NLeft,SplitDim,0);
+    for(i=0;i<NLeft;i++) cpyPoints(&data[i], &workspace[i]);
+    result->Left = createNode(para,data,NLeft,SplitDim,0);
     
     //Right ----------------------------------------------------
-    for(i=NLeft;i<N;i++) cpyPoints(&dataNode[i - NLeft], &data[i]);
-    result->Right = createNode(para,dataNode,NRight,SplitDim,0);
+   for(i=NLeft;i<N;i++) cpyPoints(&data[i - NLeft], &workspace[i]);
+    result->Right = createNode(para,data,NRight,SplitDim,0);
   }
   
-  if(firstCall) free_Point(dataNode,N);
-  
+  if(firstCall){
+    free_Point(workspace,N);
+    for(i=0;i<N;i++) cpyPoints(&data[i],&save[i]); /* Restore data */
+  }
   return result;
 }
 
