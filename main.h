@@ -44,22 +44,23 @@ Critical density, z=0 :   1.43875e+11
 #define PI    3.14159265358979323846
 #define TWOPI 6.283185307179586476925287
 
-#define INF    1.0e30
-#define ODD    0
-#define EVEN   1
-#define LEAF   0
-#define NODE   1
-#define RADEC  0
-#define CART   1
-#define CROSS  0
-#define AUTO   1
-#define GGLENS 2
-#define LS     0
-#define NAT    1
-#define HAM    2
-#define COMO   0
-#define THETA  1
-#define PHYS   2
+#define INF         1.0e30
+#define ODD         0
+#define EVEN        1
+#define LEAF        0
+#define NODE        1
+#define LIGHTNODE   2
+#define RADEC       0
+#define CART        1
+#define CROSS       0
+#define AUTO        1
+#define GGLENS      2
+#define LS          0
+#define NAT         1
+#define HAM         2
+#define COMO        0
+#define THETA       1
+#define PHYS        2
 
 
 #define MAX(x,y) ((x) > (y)) ? (x) : (y)

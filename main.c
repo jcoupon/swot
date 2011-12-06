@@ -164,9 +164,11 @@ int autoCorr(Config para, int rank, int size, int verbose){
   
   Node *dataTree   = readAndCreateTree(para,para.fileInName1,para.data1Id,rank,&Ndata);
   Node *randomTree = readAndCreateTree(para,para.fileRanName1,para.ran1Id,rank,&Nrandom);
+  
+  MPI_Barrier(MPI_COMM_WORLD);
   if(verbose) printf("DD...       ");  DD = Npairs(&para,dataTree,  dataTree,   rank, size, firstCall,verbose);
-  if(verbose) printf("DR...       ");  DR = Npairs(&para,dataTree,  randomTree, rank, size, firstCall,verbose);  free_Node(dataTree);
-  if(verbose) printf("RR...       ");  RR = Npairs(&para,randomTree,randomTree, rank, size, firstCall,verbose);  free_Node(randomTree);  
+  if(verbose) printf("DR...       ");  DR = Npairs(&para,dataTree,  randomTree, rank, size, firstCall,verbose); free_Node(dataTree);
+  if(verbose) printf("RR...       ");  RR = Npairs(&para,randomTree,randomTree, rank, size, firstCall,verbose); free_Node(randomTree);  
 
   MPI_Send(DD,  para.nbins*(para.nboots+1), MPI_LONG, master, 1, MPI_COMM_WORLD);
   MPI_Send(DR,  para.nbins*(para.nboots+1), MPI_LONG, master, 2, MPI_COMM_WORLD);
@@ -222,6 +224,7 @@ int crossCorr(Config para, int rank, int size, int verbose){
   Node *random1Tree = readAndCreateTree(para,para.fileRanName1,para.ran1Id,rank,&Nrandom1);
   Node *random2Tree = readAndCreateTree(para,para.fileRanName2,para.ran2Id,rank,&Nrandom2);
   
+  MPI_Barrier(MPI_COMM_WORLD);
   if(verbose) printf("D1D2...       ");  D1D2 = Npairs(&para,data1Tree,  data2Tree,   rank, size, firstCall,verbose);
   if(verbose) printf("D1R1...       ");  D1R1 = Npairs(&para,data1Tree,  random1Tree, rank, size, firstCall,verbose);
   if(verbose) printf("D2R2...       ");  D2R2 = Npairs(&para,data2Tree,  random2Tree, rank, size, firstCall,verbose);
@@ -685,7 +688,7 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
     //Initialization
     NN = (long *)malloc(para->nbins*(para->nboots+1)*sizeof(long));
     for(i=0;i<para->nbins;i++){
-      for(j=0;j<para->nboots+1;j++) NN[j+(para->nboots+1)*i] = 0;
+       for(j=0;j<para->nboots+1;j++) NN[j+(para->nboots+1)*i] = 0;
     }
     total = node1->N[0]*node2->N[0]; 
     count = 0;
@@ -718,7 +721,7 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
     Npairs(para,node1,node2->Right, rank, size, 0, verbose);
   }else{
     if(para->log) d = log(d);
-    if(para->proj == PHYS)  d *= dComo(node1->point[0].x[2],para->a)*PI/180.0;  /*physical coordinate projection*/
+    if(para->proj == PHYS) d *= dComo(node1->point[0].x[2],para->a)*PI/180.0;  /*physical coordinate projection*/
     k = floor((d-para->min)/para->Delta);
     if(0 <= k && k < para->nbins){
       for(i=0;i<para->nboots+1;i++) NN[i+(para->nboots+1)*k] += fac*node1->N[i]*node2->N[i];
@@ -731,6 +734,161 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
   return NN;
 }
 
+
+
+Node *createNode2(Config para, Point *data, long N, int SplitDim, int firstCall){
+
+  //THIS IS TO TEST METHODS AIMED AT REDUCING THE MEMORY USAGE
+  
+
+
+  /*Returns a pointer to the node, recursively. 
+    If N < Nmin it returns a node with no child and sets node.Left = NULL 
+    and node.Right = NULL (:= leaf). "N" is the number of points INSIDE the node.*/
+  long i,j,Nmin = 1;
+  static void *root;
+  static long countNodes;
+  static Point *dataRoot, *workspace, *save;
+  static double *xmin,*xmax;
+  
+  Node *result  = (Node *)malloc(sizeof(Node));    /* Allocate memory for THIS node */
+  
+  if(firstCall){                                   /* Allocate workspaces */ 
+    xmin       = (double *)malloc(NDIM*sizeof(double));
+    xmax       = (double *)malloc(NDIM*sizeof(double));
+    root       = result;
+    countNodes = 0;
+    workspace  = createPoint(N,para.nboots+1);
+    save       = createPoint(N,para.nboots+1); 
+    for(i=0;i<N;i++) cpyPoints(&save[i],&data[i]); /* Save data */
+  }
+  result->root = root;
+  result->id   = countNodes;
+  countNodes++;
+  
+
+
+  if(N <= Nmin){               /* leaf */
+    result->Npoint = 1;
+    result->point  =  createPoint(result->Npoint,para.nboots+1);
+    result->N      = (long *)malloc((para.nboots+1)*sizeof(long));
+    for(i=0;i<para.nboots+1;i++) result->N[i] = data[0].boots[i];
+    cpyPoints(&result->point[0],&data[0]);
+    result->radius = 0.0;
+    result->Deltaz = 0.0;
+    result->type   = LEAF;
+    result->Left   = NULL;
+    result->Right  = NULL;
+  }else{                        /* node */
+    result->type = NODE;
+    for(j=0;j<NDIM;j++){        /* node limits */
+      xmin[j] = xmax[j] = data[0].x[j];
+      for(i=0;i<N;i++) {
+	xmin[j] = MIN(xmin[j],data[i].x[j]);
+	xmax[j] = MAX(xmax[j],data[i].x[j]);
+      }
+    }
+    if(NDIM > 2) result->Deltaz = xmax[2] - xmin[2];
+
+    
+   
+    result->Npoint = 1;                       
+    result->point  =  createPoint(result->Npoint,para.nboots+1);
+    
+    result->point[0].x[0] = (xmax[0] + xmin[0])/2.0;
+    result->point[0].x[1] = (xmax[1] + xmin[1])/2.0;
+    result->point[0].cosx[0] = cos(result->point[0].x[0]*PI/180.0);
+    result->point[0].sinx[0] = sin(result->point[0].x[0]*PI/180.0);
+    result->point[0].cosx[1] = cos(result->point[0].x[1]*PI/180.0);
+    result->point[0].sinx[1] = sin(result->point[0].x[1]*PI/180.0);
+
+  
+      //Node size
+    result->radius = EPS;
+    for(i=0;i<N;i++){
+      result->radius = MAX(result->radius,para.distAng(&result->point[0], &data[i]));
+    }
+    
+    //  if(result->radius > para.OA*((Node *)root)->radius){
+
+    //  result->N      = (long *)malloc(1*sizeof(long));  /* number of objects */
+    //  result->N[0]   = N;
+
+    //    }else{
+      result->N      = (long *)malloc((para.nboots+1)*sizeof(long));  /* number of objects */
+      for(i=0;i<para.nboots+1;i++){
+	result->N[i] = 0;
+	for(j=0;j<N;j++) result->N[i] += data[j].boots[i];
+      }
+      for(j=0;j<NDIM;j++){
+	result->point[0].x[j] = 0.0;
+	for(i=0;i<N;i++) {
+	  result->point[0].x[j] += data[i].x[j]/(double)N;
+	}
+	if(j<2){
+	  result->point[0].cosx[j] = cos(result->point[0].x[j]*PI/180.0);
+	  result->point[0].sinx[j] = sin(result->point[0].x[j]*PI/180.0);
+	}
+      }  
+      result->point[0].boots[0] = result->N[0];
+      for(i=1;i<para.nboots+1;i++) result->point[0].boots[i] = roundToNi((double)result->N[i]/(double)N); 
+      if(para.corr == GGLENS){
+	result->point[0].sigz = 0.0;
+	result->point[0].e1   = 0.0;
+	result->point[0].e2   = 0.0;
+	result->point[0].w    = 0.0;
+	for(i=0;i<N;i++) {
+	  result->point[0].sigz += 0.05/(double)N;
+	  result->point[0].e1   += data[i].e1/(double)N;
+	  result->point[0].e2   += data[i].e2/(double)N;
+	  result->point[0].w    += data[i].w/(double)N;
+	}
+      }
+      //  }
+    
+    
+    double SplitValue;
+    long NLeft, NRight;
+    
+    for(i=0;i<N;i++){   /* sort values along SplitDim coordinates */
+      cpyPoints(&workspace[i], &data[i]);
+      workspace[i].SplitDim = SplitDim;
+    }
+    qsort(workspace,N,sizeof(Point),comparePoints);
+    
+    //Find SplitValue
+    switch(PARITY(N)){
+    case EVEN:
+      NLeft  = N/2;
+      NRight = N/2;
+      break;
+    case ODD:
+      NLeft  = (N+1)/2;
+      NRight = (N-1)/2;
+      break;
+    }
+    
+    //Next splitting coordinate
+    SplitDim++;
+    if(SplitDim > NDIM-1)  SplitDim = 0;
+  
+    //Left ----------------------------------------------------
+    for(i=0;i<NLeft;i++) cpyPoints(&data[i], &workspace[i]);
+    result->Left = createNode(para,data,NLeft,SplitDim,0);
+    
+    //Right ----------------------------------------------------
+   for(i=NLeft;i<N;i++) cpyPoints(&data[i - NLeft], &workspace[i]);
+    result->Right = createNode(para,data,NRight,SplitDim,0);
+  }
+  
+  if(firstCall){
+    free(xmin);
+    free(xmax);
+    free_Point(workspace,N);
+    for(i=0;i<N;i++) cpyPoints(&data[i],&save[i]); /* Restore data */
+  }
+  return result;
+}
 
 Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall){
   /*Returns a pointer to the node, recursively. 
@@ -994,7 +1152,7 @@ Output format: coord corr(coord) corr_err\n",MYNAME,MYNAME);
 	    if(!strcmp(getCharValue(item,2),"gglens")) para->corr = GGLENS;
 	  }
 	  if(!strcmp(getCharValue(item,1),"proj")) {
-	    if(!strcmp(getCharValue(item,2),"theta")) para->proj = THETA;
+	    if(!strcmp(getCharValue(item,2),"theta"))  para->proj = THETA;
 	    if(!strcmp(getCharValue(item,2),"como"))   para->proj = COMO;
 	    if(!strcmp(getCharValue(item,2),"phys"))   para->proj = PHYS;
 	  }
