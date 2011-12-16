@@ -22,6 +22,11 @@ http://www2.iap.fr/users/kilbinge/athena/
 Alexie Leauthaud's code 
 (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
 
+v 1.3 Dec 2011
+- Fixed the gg-lensing printf statement to not divied by zero when 
+there are no source galaxies.
+- Added a printout statement to print the number of sources per bin.
+
 v 1.2 Dec 2011
 - added the option -proj to give physical projection 
 for w(R) and Delta sigma
@@ -94,16 +99,21 @@ int ggCorr(Config para, int rank, int size, int verbose){
   //Initialization
   double *SigR_err_boot = (double *)malloc(para.nbins*sizeof(double));
   double *R             = (double *)malloc(para.nbins*sizeof(double));
-  double *SigR          = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
+  double *SigR          = (double *)malloc((para.nbins*(para.nboots+2))*sizeof(double)); //Note: added extra memory here to count Nsource
   double *weight        = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
   
   for(i=0;i<para.nbins;i++){
-    for(n=0;n<para.nboots+1;n++){
-      SigR[n+(para.nboots+1)*i]   = 0.0;
-      weight[n+(para.nboots+1)*i] = 0.0;
+    for(n=0;n<para.nboots+2;n++){
+      SigR[n+(para.nboots+2)*i]   = 0.0;
     }
   }
   
+  for(i=0;i<para.nbins;i++){
+    for(n=0;n<para.nboots+1;n++){
+      weight[n+(para.nboots+1)*i] = 0.0;
+    }
+  }
+
   MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) printf("Correlating lenses with sources...       ");  gg(&para,lensTree,sourceTree,SigR,weight,rank,size,firstCall,verbose);
   
@@ -130,11 +140,13 @@ int ggCorr(Config para, int rank, int size, int verbose){
     } else {
       for(i=0;i<para.nbins;i++) R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
     }    
-    
-    //SigR
+
+    //SigR, only calcualte if more than 5 sources.
     for(i=0;i<para.nbins;i++){
       for(n=0;n<para.nboots+1;n++){
-	SigR[n+(para.nboots+1)*i] /= weight[n+(para.nboots+1)*i];
+	if(SigR[para.nbins*(para.nboots+1) + i] >3){
+	  SigR[n+(para.nboots+1)*i] /= weight[n+(para.nboots+1)*i];
+	}
       }
     }
     
@@ -147,8 +159,17 @@ int ggCorr(Config para, int rank, int size, int verbose){
       SigR_err_boot[i] = sqrt(SigR_err_boot[i]/(double)(para.nboots-1));
     }
     
+    // Print out gg-lensing result:
     FILE *fileOut = fopen(para.fileOutName,"w");
-    for(i=0;i<para.nbins;i++) fprintf(fileOut,"%f %f %f %f\n",R[i],-SigR[(para.nboots+1)*i],sqrt(1.0/weight[(para.nboots+1)*i]),SigR_err_boot[i]);
+    for(i=0;i<para.nbins;i++){
+      //Note: don't divide by zero if there are too few objects in the bin. 
+      if(SigR[para.nbins*(para.nboots+1) + i]>3){
+	fprintf(fileOut,"%f %f %f %f %f\n",R[i],-SigR[(para.nboots+1)*i],sqrt(1.0/weight[(para.nboots+1)*i]),SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i]);
+      } else{
+	//Note: printing weight here and not sqrt(1/weight)
+	fprintf(fileOut,"%f %f %f %f %f\n",R[i],0.0,weight[(para.nboots+1)*i],SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i]);
+      }
+    }
     fclose(fileOut);
     
   }
@@ -671,6 +692,8 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
       weight[n+(para->nboots+1)*k]  += lens.boots[n]*w;
       SigR[n+(para->nboots+1)*k]    += lens.boots[n]*e1*w/SigCritInv;
     }
+    //keep track of Nsource per bin in this memory slot:
+    SigR[para->nbins*(para->nboots+1) + k] += 1.0;
   }
   free_Point(A,1);
 }
@@ -1065,7 +1088,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.2\n\n\
+                (Super W Of Theta) MPI version 1.3\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
