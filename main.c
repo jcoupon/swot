@@ -1,18 +1,16 @@
 /*-------------------------------------------------------------------------*
  *swot (Super W Of Theta)  mpi version                                     *
- *Jean Coupon (2011)                                                       *
+ *Jean Coupon, Alexie Leauthaud (2011)                                     *
  *-------------------------------------------------------------------------*
  
 Program to compute two-point correlation functions. Supports	
-auto and cross correlations. 
+auto and cross correlations and galaxy-galaxy lensing
 
 TO DO:
 
 - reduce memory usage: create "light" node if rmax/dmax = OA, 
 float for coordinates, warning in case of large cats?
 - merge option reading from command line and config file
-- option for physical coordinate
-
 
 Contributions:
 - The algorithm to compute the number of pairs from a tree is 
@@ -22,14 +20,19 @@ http://www2.iap.fr/users/kilbinge/athena/
 Alexie Leauthaud's code 
 (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
 
-v 1.3 Dec 2011
-- Fixed the gg-lensing printf statement to not divied by zero when 
+v 1.31 Dec 2011 [Jean]
+- Fixed a bug to properly sum up the number of 
+sources per bin from all cpus.
+
+v 1.3 Dec 2011 [Alexie]
+- Fixed the gg-lensing printf statement to not divide by zero when 
 there are no source galaxies.
 - Added a printout statement to print the number of sources per bin.
 
 v 1.2 Dec 2011
 - added the option -proj to give physical projection 
 for w(R) and Delta sigma
+
 v 1.1 Nov 2011
 - added the photo-z error in input catalogue
 lensing signal is added for zs > zl + sigz(zl)+sigz(zs)
@@ -99,7 +102,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
   //Initialization
   double *SigR_err_boot = (double *)malloc(para.nbins*sizeof(double));
   double *R             = (double *)malloc(para.nbins*sizeof(double));
-  double *SigR          = (double *)malloc((para.nbins*(para.nboots+2))*sizeof(double)); //Note: added extra memory here to count Nsource
+  double *SigR          = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); //Note: added extra memory here to count Nsource
   double *weight        = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
   
   for(i=0;i<para.nbins;i++){
@@ -117,20 +120,23 @@ int ggCorr(Config para, int rank, int size, int verbose){
   MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) printf("Correlating lenses with sources...       ");  gg(&para,lensTree,sourceTree,SigR,weight,rank,size,firstCall,verbose);
   
-  MPI_Send(SigR,    para.nbins*(para.nboots+1), MPI_DOUBLE, master, 1, MPI_COMM_WORLD);
+  MPI_Send(SigR,    para.nbins*(para.nboots+2), MPI_DOUBLE, master, 1, MPI_COMM_WORLD);
   MPI_Send(weight,  para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD);
   
   double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
   double *weightRank = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
   if(rank == master){
     for (k = 1; k < size; k++) {
-      MPI_Recv(SigRRank,   para.nbins*(para.nboots+1), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status);  
+      MPI_Recv(SigRRank,   para.nbins*(para.nboots+2), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status);  
       MPI_Recv(weightRank, para.nbins*(para.nboots+1), MPI_DOUBLE, k, 2, MPI_COMM_WORLD, &status);  
       for(i = 0;i<para.nbins;i++){
 	for(n = 0;n<para.nboots+1;n++){
 	  SigR[n+(para.nboots+1)*i]   += SigRRank[n+(para.nboots+1)*i];
 	  weight[n+(para.nboots+1)*i] += weightRank[n+(para.nboots+1)*i];
 	}
+      }
+      for(i = 0;i<para.nbins;i++){
+	SigR[para.nbins*(para.nboots+1)+i]   += SigRRank[para.nbins*(para.nboots+1)+i];
       }
     }
     
@@ -141,7 +147,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
       for(i=0;i<para.nbins;i++) R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
     }    
 
-    //SigR, only calcualte if more than 5 sources.
+    //SigR, only calculate if more than 5 sources.
     for(i=0;i<para.nbins;i++){
       for(n=0;n<para.nboots+1;n++){
 	if(SigR[para.nbins*(para.nboots+1) + i] >3){
@@ -617,7 +623,6 @@ void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, in
     count = 0;
     fflush(stdout);
   }
-  
   d = para->distAng(&lens->point[0],&source->point[0]);
   
   //Correlate nodes if (type = LEAF OR size/d < OA) AND Deltaz < sigmaz*(1+z))
@@ -697,7 +702,6 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
   }
   free_Point(A,1);
 }
-
 
 long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int firstCall, int verbose){
   double d;
@@ -1088,7 +1092,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.3\n\n\
+                (Super W Of Theta) MPI version 1.31\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
