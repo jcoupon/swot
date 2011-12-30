@@ -4,25 +4,27 @@
  *-------------------------------------------------------------------------*
  
 Program to compute two-point correlation functions. Supports	
-auto and cross correlations and galaxy-galaxy lensing
+auto and cross correlations and galaxy-galaxy lensing.
 
 TO DO:
 
 - reduce memory usage: create "light" node if rmax/dmax = OA, 
-float for coordinates, warning in case of large cats?
+  float for coordinates, warning in case of large cats?
 - merge option reading from command line and config file
+- create an array with useful info such as: Nsource, e2, 
+  and mean R
 
 Contributions:
-- The algorithm to compute the number of pairs from a tree is 
-based on Martin Kilbinger's Ahtena code:
-http://www2.iap.fr/users/kilbinge/athena/
-- The gal-gal lensing algorithm is based on
-Alexie Leauthaud's code 
-(see  Leauthaud et al. (2010),  2010ApJ...709...97L).
+- the algorithm to compute the number of pairs from a tree is 
+  based on Martin Kilbinger's Ahtena code:
+  http://www2.iap.fr/users/kilbinge/athena/
+- the gal-gal lensing algorithm is based on
+  Alexie Leauthaud's code 
+  (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
 
-v 1.31 Dec 2011 [Jean]
+v 1.32 Dec 30th 2011 [Jean]
 - Fixed a bug to properly sum up the number of 
-sources per bin from all cpus.
+  sources per bin from all cpus.
 
 v 1.3 Dec 2011 [Alexie]
 - Fixed the gg-lensing printf statement to not divide by zero when 
@@ -31,15 +33,15 @@ there are no source galaxies.
 
 v 1.2 Dec 2011
 - added the option -proj to give physical projection 
-for w(R) and Delta sigma
+  for w(R) and Delta sigma
 
 v 1.1 Nov 2011
 - added the photo-z error in input catalogue
-lensing signal is added for zs > zl + sigz(zl)+sigz(zs)
+  lensing signal is added for zs > zl + sigz(zl)+sigz(zs)
 
 v 1.0 Nov 2011
 - first version, from old "swot" code + parallel 
-computing support (mpi) and gal-gal lensing.
+  computing support (mpi) and gal-gal lensing.
 
 */
 
@@ -123,7 +125,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
   MPI_Send(SigR,    para.nbins*(para.nboots+2), MPI_DOUBLE, master, 1, MPI_COMM_WORLD);
   MPI_Send(weight,  para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD);
   
-  double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
+  double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double));
   double *weightRank = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
   if(rank == master){
     for (k = 1; k < size; k++) {
@@ -1092,7 +1094,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.31\n\n\
+                (Super W Of Theta) MPI version 1.32\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
