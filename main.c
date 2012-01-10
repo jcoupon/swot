@@ -22,9 +22,10 @@ Contributions:
   Alexie Leauthaud's code 
   (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
 
-v 1.32 Dec 30th 2011 [Jean]
+v 1.33 Jan 10th 2012 [Jean]
 - Fixed a bug to properly sum up the number of 
   sources per bin from all cpus.
+- Fixed a bug to get phys or comoving coordinates (Alexie)
 
 v 1.3 Dec 2011 [Alexie]
 - Fixed the gg-lensing printf statement to not divide by zero when 
@@ -659,14 +660,29 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
   /*See Leauthaud et al. (2010),  2010ApJ...709...97L */
   double dA, dR, AS, AL;
   double phi_gg, cos2phi_gg, sin2phi_gg, e1, e2, w;
-  double DOS, DOL, DLS, SigCritInv;
+  double fac, DOS, DOL, DLS, SigCritInv;
   Point *A = createPoint(1,para->nboots+1);
   
   int i,n,k;
   
-  dA = dComo(lens.x[2],para->a);
-  if(para->proj == COMO) dA /= (lens.x[2]+1.0);    /*comoving coordinates*/
-  dR = d*dA*PI/180.0;
+  switch(para->proj){
+  case COMO:
+    fac = lens.x[2]+1.0; /* (1+z_lens)*/
+    break;
+  case PHYS:
+    fac = 1.0;
+    break;
+  case THETA:
+    printf("Wrong coordinate system for gal-gal lensing\n");
+    exit(EXIT_FAILURE);
+    break;
+  }
+  
+  /* DA = phy_dis/angular_size_in_radians = tran_como_dis/(1+z)*/
+  
+  dA  = dComo(lens.x[2],para->a)/(lens.x[2]+1.0); /* Angular diameter distance in comoving coordinates*/ 
+  dR  = d*dA*PI/180.0;                            /* Transverse distance in phys coordinates (Mpc)    */
+  dR *= fac;                                      /* If coordinates in comoving system                */
   if(para->log) dR = log(dR);
   k = floor((dR-para->min)/para->Delta);
   if(0 <= k && k < para->nbins && source.x[2] > lens.x[2] + source.sigz + lens.sigz){
@@ -688,12 +704,12 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
     e1         =  source.e1*cos2phi_gg + source.e2*sin2phi_gg;
     //e2         = -source.e1*sin2phi_gg + source.e2*cos2phi_gg;
     //Lens equation -----------------------------
-    DOS        = dComo(source.x[2],para->a);
-    DOL        = dComo(lens.x[2],para->a);
-    if(para->proj == COMO) DOL /= (lens.x[2]+1.0); /* comoving coordinates. Cancels out for DOS/DOL. */
+    DOS        = dComo(source.x[2],para->a);/* Note this is a comoving los distance,         */ 
+    DOL        = dComo(lens.x[2],para->a);  /* but redshift factors cancel out               */
     DLS        = (dComo(source.x[2],para->a)-dComo(lens.x[2],para->a));
-    SigCritInv = DOL*DLS/DOS/1000.0;               /* 1/SigCrit in Gpc */
-    SigCritInv /= 1.663e3;                         /* see Narayan & Bartelman pge 10 */
+    SigCritInv = DOL*DLS/DOS/1000.0/fac;           /* 1/SigCrit in Gpc                       */
+    SigCritInv /= 1.663e3;                         /* see Narayan & Bartelman pge 10         */
+    SigCritInv *= fac*fac;                         /* If coordinates in comoving system      */
     w = SigCritInv*SigCritInv*source.w;
     for(n=0;n<para->nboots+1;n++){
       weight[n+(para->nboots+1)*k]  += lens.boots[n]*w;
@@ -706,7 +722,7 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
 }
 
 long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int firstCall, int verbose){
-  double d;
+  double d, dA;
   int i,j,k,l;
   static long *NN, total, count, fac;
   
@@ -749,8 +765,13 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
     Npairs(para,node1,node2->Left,  rank, size, 0, verbose);
     Npairs(para,node1,node2->Right, rank, size, 0, verbose);
   }else{
+    if(para->proj == PHYS){
+      /* Angular diameter distance in comoving coordinates*/ 
+      dA  = dComo(node1->point[0].x[2],para->a)/(node1->point[0].x[2]+1.0); 
+      /* Transverse distance in phys coordinates (Mpc)    */
+      d   = d*dA*PI/180.0;                           
+    }
     if(para->log) d = log(d);
-    if(para->proj == PHYS) d *= dComo(node1->point[0].x[2],para->a)*PI/180.0;  /*physical coordinate projection*/
     k = floor((d-para->min)/para->Delta);
     if(0 <= k && k < para->nbins){
       for(i=0;i<para->nboots+1;i++) NN[i+(para->nboots+1)*k] += fac*node1->N[i]*node2->N[i];
@@ -1094,7 +1115,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.32\n\n\
+                (Super W Of Theta) MPI version 1.33\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -1381,22 +1402,18 @@ Point *dataToPoint(Config para, double *data, int N){
   long i,j,k;
   Point *result = createPoint(N,para.nboots+1);
   
-
   //Read file
   for(i=0;i<N;i++){
     result[i].x     = (double *)malloc(NDIM*sizeof(double));
     result[i].sinx  = (double *)malloc(2*sizeof(double));
     result[i].cosx  = (double *)malloc(2*sizeof(double));
-    result[i].x[0]     = data[NIDS*i];
+    result[i].x[0]     = data[NIDS*i+0];
     result[i].x[1]     = data[NIDS*i+1]; 
-    if(para.proj == PHYS) result[i].x[2] = data[NIDS*i+2];
-    if(para.corr == GGLENS){
-      result[i].x[2]     = data[NIDS*i+2]; 
-      result[i].sigz     = data[NIDS*i+3]; 
-      result[i].e1       = data[NIDS*i+4]; 
-      result[i].e2       = data[NIDS*i+5]; 
-      result[i].w        = data[NIDS*i+6];
-    }
+    result[i].x[2]     = data[NIDS*i+2];
+    result[i].sigz     = data[NIDS*i+3]; 
+    result[i].e1       = data[NIDS*i+4]; 
+    result[i].e2       = data[NIDS*i+5]; 
+    result[i].w        = data[NIDS*i+6];
     result[i].cosx[0]  = cos(result[i].x[0]*PI/180.0);
     result[i].cosx[1]  = cos(result[i].x[1]*PI/180.0);
     result[i].sinx[0]  = sin(result[i].x[0]*PI/180.0);
@@ -1441,7 +1458,6 @@ int comparePoints(const void *a,const void *b){
   else 
     return 0; 
 }
-
 
 void cpyPoints(Point *a, Point *b){
   /*Copies b into a*/
