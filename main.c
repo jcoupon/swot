@@ -10,9 +10,18 @@ TO DO:
 
 - reduce memory usage: create "light" node if rmax/dmax = OA, 
   float for coordinates, warning in case of large cats?
+- optimize DOL/DOS, can put some of this in memory, etc ...
+- Make an option to save binary file of source tree (make an option to read it in next time..). Only really need to compute the source tree once because this never changes.
+- Fast option version for randoms: for randoms we don't need e2, nsource, don't need r_moyen ...Also randoms does not need bootstrap.
+- For randoms: read in a list of 50 different random files (these will be pre-computed). Only calcualte the source tree once. Only calcualte DOL once (randoms will all have same set of z).
+- Do the randoms one by one or all together at once? -> Stil need to deciede this question.
+- For the randoms: will give a **list** of files in input; for each random computed, writes output: [long term requirement if a single sample takes ages to be computed] store nodes completed + sum of pairs every day ?  
+- Long term: bootstrap over regions (instead of Lens by Lens). Jacknife: remove one node at a time. Do RA/DEc boxes versus RA/DEC/z boxes? But do boxes have to be independant? 
+- area bootstrap -> weigh nodes instead of objects (e.g. 0,0,1,0). Computed sum of nodes X weights in the end. 
 - merge option reading from command line and config file
 - create an array with useful info such as: Nsource, e2, 
   and mean R
+-
 
 Contributions:
 - the algorithm to compute the number of pairs from a tree is 
@@ -21,6 +30,9 @@ Contributions:
 - the gal-gal lensing algorithm is based on
   Alexie Leauthaud's code 
   (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
+
+v 1.34 Jan 18th 2012 [Alexie + Jean]
+- Added comments to code
 
 v 1.33 Jan 10th 2012 [Jean]
 - Fixed a bug to properly sum up the number of 
@@ -60,8 +72,9 @@ int main(argc,argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   
-  //Initialization
+  //Initialization: all processors read config file
   Config para; readPara(argc,argv,&para);
+
   //Last rank likely to be the slowest...
   if(rank == size - 1) verbose = 1;
   double t0 = MPI_Wtime();
@@ -103,6 +116,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
   para.nboots = nboots;
   
   //Initialization
+  //para.nboots+1: because first bin is without bootstrap (thus +1)
   double *SigR_err_boot = (double *)malloc(para.nbins*sizeof(double));
   double *R             = (double *)malloc(para.nbins*sizeof(double));
   double *SigR          = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); //Note: added extra memory here to count Nsource
@@ -119,19 +133,28 @@ int ggCorr(Config para, int rank, int size, int verbose){
       weight[n+(para.nboots+1)*i] = 0.0;
     }
   }
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (verbose) printf("Correlating lenses with sources...       ");  gg(&para,lensTree,sourceTree,SigR,weight,rank,size,firstCall,verbose);
   
-  MPI_Send(SigR,    para.nbins*(para.nboots+2), MPI_DOUBLE, master, 1, MPI_COMM_WORLD);
-  MPI_Send(weight,  para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD); /* Check point for prcoessors (all processors wait here)*/
+  if (verbose) printf("Correlating lenses with sources...       ");  
   
-  double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double));
+  // Calling gg-lensing: compute cross-correlation here
+  gg(&para,lensTree,sourceTree,SigR,weight,rank,size,firstCall,verbose);
+  
+  // Send SigR and weight to the master processor. "1" and "2" here are just an ID number 
+  // Note: when using MPI_Send or Recieve... easier to send single type tables (not structures)
+  MPI_Send(SigR,    para.nbins*(para.nboots+2), MPI_DOUBLE, master, 1, MPI_COMM_WORLD); /*1 here is an ID for SigR*/
+  MPI_Send(weight,  para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD); /*2 here is an ID for weight*/
+  
+  double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); /*This is only used by master*/
   double *weightRank = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
+
+  // Summing over contributions from all processors
+  // Rank is the processor ID 
   if(rank == master){
-    for (k = 1; k < size; k++) {
-      MPI_Recv(SigRRank,   para.nbins*(para.nboots+2), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status);  
-      MPI_Recv(weightRank, para.nbins*(para.nboots+1), MPI_DOUBLE, k, 2, MPI_COMM_WORLD, &status);  
+    for (k = 1; k < size; k++) { /*Loop over processors, "size" is N processors, start at 1 because 0 is Master*/
+      MPI_Recv(SigRRank,   para.nbins*(para.nboots+2), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status);  /*Master recieves information, stored in SigRRank*/
+      MPI_Recv(weightRank, para.nbins*(para.nboots+1), MPI_DOUBLE, k, 2, MPI_COMM_WORLD, &status); 
+      // Add together contributions from processors :
       for(i = 0;i<para.nbins;i++){
 	for(n = 0;n<para.nboots+1;n++){
 	  SigR[n+(para.nboots+1)*i]   += SigRRank[n+(para.nboots+1)*i];
@@ -143,14 +166,15 @@ int ggCorr(Config para, int rank, int size, int verbose){
       }
     }
     
-    //R(Mpc)
+    // R(Mpc)
+    // TO CHANGE: calculte mean here, get sum of R's and divide by N_tot_source later ...
     if(para.log){
       for(i=0;i<para.nbins;i++) R[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);  
     } else {
       for(i=0;i<para.nbins;i++) R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
     }    
 
-    //SigR, only calculate if more than 5 sources.
+    //SigR, only calculate if more than 3 sources (avoid division by zero).
     for(i=0;i<para.nbins;i++){
       for(n=0;n<para.nboots+1;n++){
 	if(SigR[para.nbins*(para.nboots+1) + i] >3){
@@ -160,6 +184,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
     }
     
     //Bootstrap errors
+    // TO do: bootstrap on RA/DEC boxes and write covar matrix
     for(i=0;i<para.nbins;i++){
       SigR_err_boot[i] = 0.0;
       for(n=1;n<para.nboots+1;n++){
@@ -1115,7 +1140,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.33\n\n\
+                (Super W Of Theta) MPI version 1.34\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
