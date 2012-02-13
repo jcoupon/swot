@@ -11,17 +11,27 @@ TO DO:
 - reduce memory usage: create "light" node if rmax/dmax = OA, 
   float for coordinates, warning in case of large cats?
 - optimize DOL/DOS, can put some of this in memory, etc ...
-- Make an option to save binary file of source tree (make an option to read it in next time..). Only really need to compute the source tree once because this never changes.
-- Fast option version for randoms: for randoms we don't need e2, nsource, don't need r_moyen ...Also randoms does not need bootstrap.
-- For randoms: read in a list of 50 different random files (these will be pre-computed). Only calcualte the source tree once. Only calcualte DOL once (randoms will all have same set of z).
-- Do the randoms one by one or all together at once? -> Stil need to deciede this question.
-- For the randoms: will give a **list** of files in input; for each random computed, writes output: [long term requirement if a single sample takes ages to be computed] store nodes completed + sum of pairs every day ?  
-- Long term: bootstrap over regions (instead of Lens by Lens). Jacknife: remove one node at a time. Do RA/DEc boxes versus RA/DEC/z boxes? But do boxes have to be independant? 
-- area bootstrap -> weigh nodes instead of objects (e.g. 0,0,1,0). Computed sum of nodes X weights in the end. 
+- Make an option to save binary file of source tree (make an 
+  option to read it in next time..). Only really need to compute 
+  the source tree once because this never changes.
+- Fast option version for randoms: for randoms we don't need e2, 
+  nsource, don't need r_moyen ...Also randoms does not need bootstrap.
+- For randoms: read in a list of 50 different random files (these will 
+  be pre-computed). Only calcualte the source tree once. Only calcualte 
+  DOL once (randoms will all have same set of z).
+- Do the randoms one by one or all together at once? -> Still need 
+  to decide this question.
+- For the randoms: will give a **list** of files in input; for each 
+  random computed, writes output: [long term requirement if a single sample 
+  takes ages to be computed] store nodes completed + sum of pairs  every day ?  
+- Long term: bootstrap over regions (instead of Lens by Lens). 
+  Jackknife: remove one node at a time. Do RA/DEc boxes versus 
+  RA/DEC/z boxes? But do boxes have to be independant? 
+- area bootstrap -> weigh nodes instead of objects (e.g. 0,0,1,0). 
+  Computed sum of nodes X weights in the end. 
 - merge option reading from command line and config file
 - create an array with useful info such as: Nsource, e2, 
   and mean R
--
 
 Contributions:
 - the algorithm to compute the number of pairs from a tree is 
@@ -67,30 +77,35 @@ int main(argc,argv)
   int  master = 0, firstCall = 1, verbose = 0;
   int rank, size, nboots;
   
+  /* MPI initialization */
   MPI_Status status;
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   
-  //Initialization: all processors read config file
+  /* initialization: all processors read config file */
   Config para; readPara(argc,argv,&para);
-
-  //Last rank likely to be the slowest...
+  
+  /* last rank likely to be the slowest */
   if(rank == size - 1) verbose = 1;
   double t0 = MPI_Wtime();
   
   switch (para.corr){
   case AUTO:
+    /* two-point autocorrelation function */
     autoCorr(para,rank,size,verbose);
     break;
   case CROSS:
+    /* two-point cross-correlation function */
     crossCorr(para,rank,size,verbose);
     break;
   case GGLENS:
     ggCorr(para,rank,size,verbose);
+    /* galaxy-galaxy lensing two-point cross-correlation function */
     break;
   }
-    
+  
+  /* computation time */
   MPI_Barrier(MPI_COMM_WORLD);
   if(rank == master) printf("Elapsed time: %5.2f s\n", MPI_Wtime() - t0);
   
@@ -109,11 +124,15 @@ int ggCorr(Config para, int rank, int size, int verbose){
   int  nboots,master = 0, firstCall = 1;
   MPI_Status status;
   
+  /* tree for lenses */
   Node *lensTree   = readAndCreateTree(para,para.fileInName1,para.data1Id,rank,&Nlenses);
-  //No bootstrap for sources (errors from weights)
-  nboots     = para.nboots; para.nboots = 0;
+  nboots           = para.nboots; 
+  
+  /* tree for sources <- this is a memory monster */
+  para.nboots      = 0;      /* no bootstrap for sources (errors from weights) */
   Node *sourceTree = readAndCreateTree(para,para.fileInName2,para.data2Id,rank,&Nsources);
-  para.nboots = nboots;
+  
+  para.nboots      = nboots; /* re-set bootstrap for lenses */
   
   //Initialization
   //para.nboots+1: because first bin is without bootstrap (thus +1)
@@ -121,6 +140,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
   double *R             = (double *)malloc(para.nbins*sizeof(double));
   double *SigR          = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); //Note: added extra memory here to count Nsource
   double *weight        = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
+  
   
   for(i=0;i<para.nbins;i++){
     for(n=0;n<para.nboots+2;n++){
@@ -134,31 +154,52 @@ int ggCorr(Config para, int rank, int size, int verbose){
     }
   }
   
-  MPI_Barrier(MPI_COMM_WORLD); /* Check point for prcoessors (all processors wait here)*/
+  /* this array contains pieces of information computed in gg(...)
+     0: bootstrap errors for SigR     
+  */
+  para.Ninfo            = 10;
+  double *info          = (double *)malloc(para.Ninfo*para.nbins*sizeof(double));
+  for(i=0;i<para.nbins;i++){
+    for(n=0;n<para.Ninfo;n++){
+      info[n+(para.Ninfo)*i] = 0.0;
+    }
+  }
+  
+  
+  MPI_Barrier(MPI_COMM_WORLD); /* Check point for processors (all processors wait here)*/
   if (verbose) printf("Correlating lenses with sources...       ");  
   
   // Calling gg-lensing: compute cross-correlation here
-  gg(&para,lensTree,sourceTree,SigR,weight,rank,size,firstCall,verbose);
+  gg(&para,lensTree,sourceTree,SigR,weight,info,rank,size,firstCall,verbose);
   
   // Send SigR and weight to the master processor. "1" and "2" here are just an ID number 
   // Note: when using MPI_Send or Recieve... easier to send single type tables (not structures)
   MPI_Send(SigR,    para.nbins*(para.nboots+2), MPI_DOUBLE, master, 1, MPI_COMM_WORLD); /*1 here is an ID for SigR*/
   MPI_Send(weight,  para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD); /*2 here is an ID for weight*/
+  MPI_Send(info,    para.nbins*para.Ninfo,      MPI_DOUBLE, master, 3, MPI_COMM_WORLD); /*3 here is an ID for info*/
+  
   
   double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); /*This is only used by master*/
   double *weightRank = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
+  double *infoRank   = (double *)malloc(para.nbins*para.Ninfo*sizeof(double));
+  
 
   // Summing over contributions from all processors
   // Rank is the processor ID 
   if(rank == master){
     for (k = 1; k < size; k++) { /*Loop over processors, "size" is N processors, start at 1 because 0 is Master*/
-      MPI_Recv(SigRRank,   para.nbins*(para.nboots+2), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status);  /*Master recieves information, stored in SigRRank*/
+      /* master receives information from [...] and stores in [...]Rank*/
+      MPI_Recv(SigRRank,   para.nbins*(para.nboots+2), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status); 
       MPI_Recv(weightRank, para.nbins*(para.nboots+1), MPI_DOUBLE, k, 2, MPI_COMM_WORLD, &status); 
-      // Add together contributions from processors :
+      MPI_Recv(infoRank,   para.nbins*para.Ninfo     , MPI_DOUBLE, k, 3, MPI_COMM_WORLD, &status); 
+      /* add together contributions from processors : */
       for(i = 0;i<para.nbins;i++){
 	for(n = 0;n<para.nboots+1;n++){
 	  SigR[n+(para.nboots+1)*i]   += SigRRank[n+(para.nboots+1)*i];
 	  weight[n+(para.nboots+1)*i] += weightRank[n+(para.nboots+1)*i];
+	}
+	for(n = 0;n<para.Ninfo;n++){
+	  info[n+para.Ninfo*i] += infoRank[n+para.Ninfo*i];
 	}
       }
       for(i = 0;i<para.nbins;i++){
@@ -198,7 +239,7 @@ int ggCorr(Config para, int rank, int size, int verbose){
     for(i=0;i<para.nbins;i++){
       //Note: don't divide by zero if there are too few objects in the bin. 
       if(SigR[para.nbins*(para.nboots+1) + i]>3){
-	fprintf(fileOut,"%f %f %f %f %f\n",R[i],-SigR[(para.nboots+1)*i],sqrt(1.0/weight[(para.nboots+1)*i]),SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i]);
+	fprintf(fileOut,"%f %f %f %f %f %f\n",R[i],-SigR[(para.nboots+1)*i],sqrt(1.0/weight[(para.nboots+1)*i]),SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i],info[0+para.Ninfo*i]);
       } else{
 	//Note: printing weight here and not sqrt(1/weight)
 	fprintf(fileOut,"%f %f %f %f %f\n",R[i],0.0,weight[(para.nboots+1)*i],SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i]);
@@ -207,7 +248,10 @@ int ggCorr(Config para, int rank, int size, int verbose){
     fclose(fileOut);
     
   }
+
+  /* TO DO : add frees here */
   
+  free(info);
   return SUCCESS;
 }
 
@@ -635,7 +679,7 @@ Node  **getNodesForCpu(Config *para, Node *data, int count, int firstCall){
 }
 
 
-void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, int rank, int size,  int firstCall, int verbose){
+void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, double *info, int rank, int size,  int firstCall, int verbose){
   double d;
   Node **node1Rank;
   static long i,total, count;  
@@ -656,21 +700,21 @@ void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, in
   //Correlate nodes if (type = LEAF OR size/d < OA) AND Deltaz < sigmaz*(1+z))
   if(lens->type != LEAF && lens->radius/d > para->OA || lens->Deltaz > para->sigz*(1.0+lens->point[0].x[2])){
     if( source->type != LEAF && source->radius/d > para->OA || source->Deltaz > para->sigz*(1.0+source->point[0].x[2])){
-      gg(para,lens->Left,  source->Left,  SigR, weight, rank, size, 0, verbose);
-      gg(para,lens->Right, source->Right, SigR, weight, rank, size, 0, verbose);
-      gg(para,lens->Left,  source->Right, SigR, weight, rank, size, 0, verbose);
-      gg(para,lens->Right, source->Left,  SigR, weight, rank, size, 0, verbose);
+      gg(para,lens->Left,  source->Left,  SigR, weight, info, rank, size, 0, verbose);
+      gg(para,lens->Right, source->Right, SigR, weight, info, rank, size, 0, verbose);
+      gg(para,lens->Left,  source->Right, SigR, weight, info, rank, size, 0, verbose);
+      gg(para,lens->Right, source->Left,  SigR, weight, info, rank, size, 0, verbose);
     }else{
-      gg(para,lens->Left,source,  SigR, weight, rank, size, 0, verbose);
-      gg(para,lens->Right,source, SigR, weight, rank, size, 0, verbose);
+      gg(para,lens->Left,source,  SigR, weight, info, rank, size, 0, verbose);
+      gg(para,lens->Right,source, SigR, weight, info, rank, size, 0, verbose);
     }
   }else if( source->type != LEAF && source->radius/d > para->OA || source->Deltaz > para->sigz*(1.0+source->point[0].x[2])){
-    gg(para,lens,source->Left,  SigR, weight, rank, size, 0, verbose);
-    gg(para,lens,source->Right, SigR, weight, rank, size, 0, verbose);
+    gg(para,lens,source->Left,  SigR, weight, info, rank, size, 0, verbose);
+    gg(para,lens,source->Right, SigR, weight, info, rank, size, 0, verbose);
   }else{
-    corrLensSource(para,lens->point[0],source->point[0],d,SigR,weight);
+    corrLensSource(para,lens->point[0], source->point[0], d, SigR, weight, info);
     count +=  lens->N[0]*source->N[0];
-    printCount(&count,&total,verbose);
+    printCount(&count, &total, verbose);
   }
   
   if(firstCall){
@@ -681,7 +725,7 @@ void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, in
   return;
 }
 
-void corrLensSource(Config *para, Point lens, Point source, double d, double *SigR, double *weight){
+void corrLensSource(Config *para, Point lens, Point source, double d, double *SigR, double *weight, double *info){
   /*See Leauthaud et al. (2010),  2010ApJ...709...97L */
   double dA, dR, AS, AL;
   double phi_gg, cos2phi_gg, sin2phi_gg, e1, e2, w;
@@ -742,6 +786,7 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
     }
     //keep track of Nsource per bin in this memory slot:
     SigR[para->nbins*(para->nboots+1) + k] += 1.0;
+    info[0+para->Ninfo*k] += 1.0;
   }
   free_Point(A,1);
 }

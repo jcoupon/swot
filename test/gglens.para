@@ -11,7 +11,7 @@ coord          RADEC	  #Coordinates: RADEC (in deg) or CART
 #Correlation options                                       #
 #----------------------------------------------------------#
 corr           gglens	 #Type of correlation: auto, cross or gglens
-range          303-3,3	 #Correlation range
+range          303e-3,3	 #Correlation range
 nbins          10	 #Number of bins
 log            yes	 #Logarithmic bins (yes or no)
 nboots         0	 #Number of bootstrap samples

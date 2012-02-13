@@ -105,7 +105,7 @@ typedef struct LightNode
 
 typedef struct Config
 {
-  int cov_mat, nboots, estimator, nbins,corr, coordType, log;
+  int cov_mat, nboots, estimator, nbins,corr, coordType, log, Ninfo;
   
   /*For gg lensing, default: comoving (COMO). 
     For auto/cross, default: theta (THETA).
@@ -145,8 +145,8 @@ void writeHamilton(Config para, long *D1D2, long *D1R1, long *D2R2, long *R1R2, 
 Node  **getNodesForCpu(Config *para, Node *data, int count, int firstCall);
 long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int firstCall, int verbose);
 Node *createNode(Config para, Point *data, long N, int SplitDim, int firstCall);
-void gg(Config *para, Node *source, Node *lens, double *SigR, double *w, int rank, int size,  int firstCall, int verbose);
-void corrLensSource(Config *para, Point lens, Point source, double d, double *SigR, double *weight);
+void gg(Config *para, Node *source, Node *lens, double *SigR, double *weights, double*info, int rank, int size,  int firstCall, int verbose);
+void corrLensSource(Config *para, Point lens, Point source, double d, double *SigR, double *weight, double *info);
 
 /*----------------------------------------------------------------*
  *Configuration                                                   *
