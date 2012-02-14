@@ -5,13 +5,13 @@
 data1          test/lenses.cat  #input data catalogue #1
 cols1          1,2,3,4	  #Column ids for data1
 data2          test/sources.cat  #input data catalogue #2
-cols2          1,2,3,7,4,5,6	  #Column ids for data2
+cols2          1,2,3,4,5,6,7	  #Column ids for data2
 coord          RADEC	  #Coordinates: RADEC (in deg) or CART
 #----------------------------------------------------------#
 #Correlation options                                       #
 #----------------------------------------------------------#
 corr           gglens	 #Type of correlation: auto, cross or gglens
-range          303e-3,3	 #Correlation range
+range          30e-3,3	 #Correlation range
 nbins          10	 #Number of bins
 log            yes	 #Logarithmic bins (yes or no)
 nboots         0	 #Number of bootstrap samples
@@ -23,6 +23,7 @@ H0             72	 #Hubble parameter
 Omega_M        0.258	 #Relative matter density
 Omega_L        0.742	 #Relative energy density (Lambda)
 sigz           0.03	 #Redshift accuracy
+proj           como	 #Axis projection (or phys)
 #----------------------------------------------------------#
 #Output options                                            #
 #----------------------------------------------------------#

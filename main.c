@@ -1,6 +1,6 @@
 /*-------------------------------------------------------------------------*
  *swot (Super W Of Theta)  mpi version                                     *
- *Jean Coupon, Alexie Leauthaud (2011)                                     *
+ *Jean Coupon, Alexie Leauthaud (2012)                                     *
  *-------------------------------------------------------------------------*
  
 Program to compute two-point correlation functions. Supports	
@@ -32,6 +32,10 @@ TO DO:
 - merge option reading from command line and config file
 - create an array with useful info such as: Nsource, e2, 
   and mean R
+- options to take into account the East-West orientation
+- measure the tangential shear
+- ATTENTION: so far individual photo-z error not taken into
+  account (only global sigz set in config file)
 
 Contributions:
 - the algorithm to compute the number of pairs from a tree is 
@@ -40,6 +44,10 @@ Contributions:
 - the gal-gal lensing algorithm is based on
   Alexie Leauthaud's code 
   (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
+
+v 1.4 Feb 14th 2012 [Jean]
+- now displays <R>, e2 and Nsources
+- output file format is improved
 
 v 1.34 Jan 18th 2012 [Alexie + Jean]
 - Added comments to code
@@ -80,13 +88,15 @@ int main(argc,argv)
   /* MPI initialization */
   MPI_Status status;
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  /* "rank" is the id of the current cpu in use [0: master, size-1: last cpu]    */
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
+  /* "size" is the total number of cpus in use. "-np" option when calling mpirun */
+  MPI_Comm_size(MPI_COMM_WORLD, &size); 
   
-  /* initialization: all processors read config file */
+  /* initialization: all cpus read config file */
   Config para; readPara(argc,argv,&para);
   
-  /* last rank likely to be the slowest */
+  /* last rank likely to be the slowest and used to display the messages */
   if(rank == size - 1) verbose = 1;
   double t0 = MPI_Wtime();
   
@@ -120,10 +130,10 @@ int main(argc,argv)
 
 int ggCorr(Config para, int rank, int size, int verbose){
   /*Computes the galaxy-galaxy shear correlation function*/
-  long i,k,n,Nsources, Nlenses;
+  long i,j,k,n,Nsources, Nlenses;
   int  nboots,master = 0, firstCall = 1;
   MPI_Status status;
-  
+ 
   /* tree for lenses */
   Node *lensTree   = readAndCreateTree(para,para.fileInName1,para.data1Id,rank,&Nlenses);
   nboots           = para.nboots; 
@@ -134,62 +144,51 @@ int ggCorr(Config para, int rank, int size, int verbose){
   
   para.nboots      = nboots; /* re-set bootstrap for lenses */
   
-  //Initialization
-  //para.nboots+1: because first bin is without bootstrap (thus +1)
-  double *SigR_err_boot = (double *)malloc(para.nbins*sizeof(double));
-  double *R             = (double *)malloc(para.nbins*sizeof(double));
-  double *SigR          = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); //Note: added extra memory here to count Nsource
+  /* initialization. para.nboots+1: because first bin is without bootstrap (thus +1) */
+  double *SigR          = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
   double *weight        = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
-  
-  
-  for(i=0;i<para.nbins;i++){
-    for(n=0;n<para.nboots+2;n++){
-      SigR[n+(para.nboots+2)*i]   = 0.0;
-    }
-  }
+  /* "info" contains the useful pieces of information:
+     0 -> number of sources 
+     1 -> mean R
+     2 -> e2
+  */
+  para.Ninfo   = 3;
+  double *info = (double *)malloc(para.Ninfo*para.nbins*sizeof(double));
   
   for(i=0;i<para.nbins;i++){
     for(n=0;n<para.nboots+1;n++){
       weight[n+(para.nboots+1)*i] = 0.0;
+      SigR[n+(para.nboots+1)*i]   = 0.0;
     }
-  }
-  
-  /* this array contains pieces of information computed in gg(...)
-     0: bootstrap errors for SigR     
-  */
-  para.Ninfo            = 10;
-  double *info          = (double *)malloc(para.Ninfo*para.nbins*sizeof(double));
-  for(i=0;i<para.nbins;i++){
-    for(n=0;n<para.Ninfo;n++){
-      info[n+(para.Ninfo)*i] = 0.0;
+    for(j=0;j<para.Ninfo;j++){
+      info[j+(para.Ninfo)*i]      = 0.0;
     }
-  }
+  } 
   
-  
-  MPI_Barrier(MPI_COMM_WORLD); /* Check point for processors (all processors wait here)*/
+  /* Check point for processors (all processors wait here)*/
+  MPI_Barrier(MPI_COMM_WORLD);
   if (verbose) printf("Correlating lenses with sources...       ");  
   
-  // Calling gg-lensing: compute cross-correlation here
+  /* calling gg-lensing: compute cross-correlation here */
   gg(&para,lensTree,sourceTree,SigR,weight,info,rank,size,firstCall,verbose);
   
-  // Send SigR and weight to the master processor. "1" and "2" here are just an ID number 
-  // Note: when using MPI_Send or Recieve... easier to send single type tables (not structures)
-  MPI_Send(SigR,    para.nbins*(para.nboots+2), MPI_DOUBLE, master, 1, MPI_COMM_WORLD); /*1 here is an ID for SigR*/
-  MPI_Send(weight,  para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD); /*2 here is an ID for weight*/
-  MPI_Send(info,    para.nbins*para.Ninfo,      MPI_DOUBLE, master, 3, MPI_COMM_WORLD); /*3 here is an ID for info*/
+  /* send "SigR", "weight" and "info" to the master processor. "1" and "2" here are just an ID number */ 
+  /* note: when using MPI_Send or Recieve... easier to send single type tables (not structures)       */
+  MPI_Send(SigR,   para.nbins*(para.nboots+1), MPI_DOUBLE, master, 1, MPI_COMM_WORLD); /*1 here is an ID for SigR  */
+  MPI_Send(weight, para.nbins*(para.nboots+1), MPI_DOUBLE, master, 2, MPI_COMM_WORLD); /*2 here is an ID for weight*/
+  MPI_Send(info,   para.nbins*para.Ninfo,      MPI_DOUBLE, master, 3, MPI_COMM_WORLD); /*3 here is an ID for info  */
   
-  
-  double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+2)*sizeof(double)); /*This is only used by master*/
-  double *weightRank = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
-  double *infoRank   = (double *)malloc(para.nbins*para.Ninfo*sizeof(double));
-  
-
-  // Summing over contributions from all processors
-  // Rank is the processor ID 
+  /* summing over contributions from all cpus. From now on only the master is working */
   if(rank == master){
-    for (k = 1; k < size; k++) { /*Loop over processors, "size" is N processors, start at 1 because 0 is Master*/
-      /* master receives information from [...] and stores in [...]Rank*/
-      MPI_Recv(SigRRank,   para.nbins*(para.nboots+2), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status); 
+    /* the following is only used by master */
+    double *SigRRank   = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double)); 
+    double *weightRank = (double *)malloc(para.nbins*(para.nboots+1)*sizeof(double));
+    double *infoRank   = (double *)malloc(para.nbins*para.Ninfo*sizeof(double));
+    
+    /* loop over cpus, "size" is N cpus, start at 1 because 0 is master*/
+    for (k = 1; k < size; k++) { 
+      /* master receives information from "k" and stores the info in [...]Rank */
+      MPI_Recv(SigRRank,   para.nbins*(para.nboots+1), MPI_DOUBLE, k, 1, MPI_COMM_WORLD, &status); 
       MPI_Recv(weightRank, para.nbins*(para.nboots+1), MPI_DOUBLE, k, 2, MPI_COMM_WORLD, &status); 
       MPI_Recv(infoRank,   para.nbins*para.Ninfo     , MPI_DOUBLE, k, 3, MPI_COMM_WORLD, &status); 
       /* add together contributions from processors : */
@@ -198,65 +197,85 @@ int ggCorr(Config para, int rank, int size, int verbose){
 	  SigR[n+(para.nboots+1)*i]   += SigRRank[n+(para.nboots+1)*i];
 	  weight[n+(para.nboots+1)*i] += weightRank[n+(para.nboots+1)*i];
 	}
-	for(n = 0;n<para.Ninfo;n++){
-	  info[n+para.Ninfo*i] += infoRank[n+para.Ninfo*i];
+	for(j = 0;j<para.Ninfo;j++){
+	  info[j+para.Ninfo*i] += infoRank[j+para.Ninfo*i];
 	}
       }
-      for(i = 0;i<para.nbins;i++){
-	SigR[para.nbins*(para.nboots+1)+i]   += SigRRank[para.nbins*(para.nboots+1)+i];
-      }
     }
+    free(SigRRank);
+    free(weightRank);
+    free(infoRank);
+   
     
-    // R(Mpc)
-    // TO CHANGE: calculte mean here, get sum of R's and divide by N_tot_source later ...
+    /* R(Mpc) */
+    /* TO CHANGE: calculte mean here, get sum of R's and divide by N_tot_source later ...
+    double *R = (double *)malloc(para.nbins*sizeof(double));
     if(para.log){
       for(i=0;i<para.nbins;i++) R[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);  
     } else {
       for(i=0;i<para.nbins;i++) R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
-    }    
+    }
+    */
 
-    //SigR, only calculate if more than 3 sources (avoid division by zero).
+    /* SigR, only calculate if more than 3 sources (avoid division by zero) */
     for(i=0;i<para.nbins;i++){
       for(n=0;n<para.nboots+1;n++){
-	if(SigR[para.nbins*(para.nboots+1) + i] >3){
-	  SigR[n+(para.nboots+1)*i] /= weight[n+(para.nboots+1)*i];
-	}
+	if(info[0+para.Ninfo*i] > 3.0) SigR[n+(para.nboots+1)*i] /= weight[n+(para.nboots+1)*i];
       }
     }
     
-    //Bootstrap errors
-    // TO do: bootstrap on RA/DEC boxes and write covar matrix
+    /* bootstrap errors */
+    // TO DO: bootstrap on RA/DEC boxes and write covar matrix
+    double *SigR_err_boot = (double *)malloc(para.nbins*sizeof(double));
     for(i=0;i<para.nbins;i++){
       SigR_err_boot[i] = 0.0;
       for(n=1;n<para.nboots+1;n++){
 	SigR_err_boot[i] += (SigR[(para.nboots+1)*i] - SigR[n+(para.nboots+1)*i])*(SigR[(para.nboots+1)*i] - SigR[n+(para.nboots+1)*i]);
       }
-      SigR_err_boot[i] = sqrt(SigR_err_boot[i]/(double)(para.nboots-1));
+      if(para.nboots > 1) SigR_err_boot[i] = sqrt(SigR_err_boot[i]/(double)(para.nboots-1));
     }
     
-    // Print out gg-lensing result:
+    /* print out gg-lensing results */
+    double R,Rmean;
     FILE *fileOut = fopen(para.fileOutName,"w");
+    fprintf(fileOut,"#gal-gal lensing. Sigma(R), linear approximation\n");
+    if(para.proj == COMO){
+      fprintf(fileOut,"#R(Mpc) in comoving coordinates\n");
+    }else if(para.proj == PHYS){
+      fprintf(fileOut,"#R(Mpc) in physical coordinates\n");
+    }
+    fprintf(fileOut,"#Nbootstraps = %d\n",para.nboots);
+    fprintf(fileOut,"#  R(Mpc) SigR(Msun/pc^2)  Err_weights   Err_bootstrap     Nsources       <R>         e2\n");
     for(i=0;i<para.nbins;i++){
-      //Note: don't divide by zero if there are too few objects in the bin. 
-      if(SigR[para.nbins*(para.nboots+1) + i]>3){
-	fprintf(fileOut,"%f %f %f %f %f %f\n",R[i],-SigR[(para.nboots+1)*i],sqrt(1.0/weight[(para.nboots+1)*i]),SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i],info[0+para.Ninfo*i]);
-      } else{
-	//Note: printing weight here and not sqrt(1/weight)
-	fprintf(fileOut,"%f %f %f %f %f\n",R[i],0.0,weight[(para.nboots+1)*i],SigR_err_boot[i],SigR[para.nbins*(para.nboots+1) + i]);
+      /* don't divide by zero if there are too few objects in the bin */
+      if(info[0+para.Ninfo*i] < 3.0) weight[(para.nboots+1)*i] = 1.0;
+      /* R and Rmean (weighted) */
+      if(para.log){ 
+	R     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	Rmean = exp(info[1+para.Ninfo*i]/weight[(para.nboots+1)*i]);
+      }else{
+	R     = para.min+para.Delta*(double)i+para.Delta/2.0;
+	Rmean = info[1+para.Ninfo*i]/weight[(para.nboots+1)*i];
       }
+      fprintf(fileOut,"%12.7f %12.7f %12.7f %12.7f %15zd %12.7f %12.7f\n", 
+	      R,-SigR[(para.nboots+1)*i],				\
+	      sqrt(1.0/weight[(para.nboots+1)*i]), SigR_err_boot[i],	\
+	      (long)info[0+para.Ninfo*i],				\
+	      Rmean,							\
+	      info[2+para.Ninfo*i]/weight[(para.nboots+1)*i]);
     }
     fclose(fileOut);
-    
+    free(SigR_err_boot);
   }
-
-  /* TO DO : add frees here */
   
+  free(weight);
+  free(SigR);
   free(info);
   return SUCCESS;
 }
 
 int autoCorr(Config para, int rank, int size, int verbose){
-  /*Computes the auto correlation function*/
+  /* Computes the auto correlation function */
   long i,j,k,Ndata, Nrandom, *DD, *DR, *RR;
   int  master = 0, firstCall = 1;
   MPI_Status status;
@@ -273,11 +292,11 @@ int autoCorr(Config para, int rank, int size, int verbose){
   MPI_Send(DR,  para.nbins*(para.nboots+1), MPI_LONG, master, 2, MPI_COMM_WORLD);
   MPI_Send(RR,  para.nbins*(para.nboots+1), MPI_LONG, master, 3, MPI_COMM_WORLD);
   
-  long *DDRank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  long *DRRank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  long *RRRank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  
   if(rank == master){
+    long *DDRank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    long *DRRank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    long *RRRank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    
     for (k = 1; k < size; k++) {
       MPI_Recv(DDRank, para.nbins*(para.nboots+1), MPI_LONG , k, 1, MPI_COMM_WORLD, &status);  
       MPI_Recv(DRRank, para.nbins*(para.nboots+1), MPI_LONG , k, 2, MPI_COMM_WORLD, &status);  
@@ -290,6 +309,9 @@ int autoCorr(Config para, int rank, int size, int verbose){
 	}
       }
     }
+    free(DDRank);
+    free(DRRank);
+    free(RRRank);
   }
   
   if(rank == master)
@@ -305,9 +327,9 @@ int autoCorr(Config para, int rank, int size, int verbose){
       break;
     }
 
-  free(DD); free(DDRank);
-  free(DR); free(DRRank);
-  free(RR); free(RRRank);
+  free(DD);
+  free(DR);
+  free(RR);
   
   return SUCCESS;
 }
@@ -334,12 +356,12 @@ int crossCorr(Config para, int rank, int size, int verbose){
   MPI_Send(D2R2,  para.nbins*(para.nboots+1), MPI_LONG, master, 3, MPI_COMM_WORLD);
   MPI_Send(R1R2,  para.nbins*(para.nboots+1), MPI_LONG, master, 4, MPI_COMM_WORLD);
   
-  long *D1D2Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  long *D1R1Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  long *D2R2Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  long *R1R2Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
-  
   if(rank == master){
+    long *D1D2Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    long *D1R1Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    long *D2R2Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    long *R1R2Rank = (long *)malloc(para.nbins*(para.nboots+1)*sizeof(long));
+    
     for (k = 1; k < size; k++) {
       MPI_Recv(D1D2Rank, para.nbins*(para.nboots+1), MPI_LONG , k, 1, MPI_COMM_WORLD, &status);  
       MPI_Recv(D1R1Rank, para.nbins*(para.nboots+1), MPI_LONG , k, 2, MPI_COMM_WORLD, &status);  
@@ -354,6 +376,10 @@ int crossCorr(Config para, int rank, int size, int verbose){
 	}
       }
     }
+    free(D1D2Rank);
+    free(D1R1Rank);
+    free(D2R2Rank);
+    free(R1R2Rank);
   }
   
   if(rank == master)
@@ -369,10 +395,10 @@ int crossCorr(Config para, int rank, int size, int verbose){
       break;
     }
   
-  free(D1D2); free(D1D2Rank);
-  free(D1R1); free(D1R1Rank);
-  free(D2R2); free(D2R2Rank);
-  free(R1R2); free(R1R2Rank);
+  free(D1D2); 
+  free(D1R1); 
+  free(D2R2); 
+  free(R1R2); 
   free_Node(data1Tree);
   free_Node(random1Tree);  
   free_Node(data2Tree);
@@ -680,12 +706,13 @@ Node  **getNodesForCpu(Config *para, Node *data, int count, int firstCall){
 
 
 void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, double *info, int rank, int size,  int firstCall, int verbose){
+  /* Computes the galaxy-galaxy two-point correlation function */
   double d;
   Node **node1Rank;
   static long i,total, count;  
-
+  
   if(firstCall){
-    //Distribute tree nodes among cpus
+    /* distribute tree nodes among cpus */
     node1Rank = getNodesForCpu(para,source,size,firstCall);
     source    = node1Rank[rank];
     for(i=0;i<size;i++){
@@ -697,7 +724,7 @@ void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, do
   }
   d = para->distAng(&lens->point[0],&source->point[0]);
   
-  //Correlate nodes if (type = LEAF OR size/d < OA) AND Deltaz < sigmaz*(1+z))
+  /* correlate nodes if (type = LEAF OR size/d < OA) AND Deltaz < sigmaz*(1+z)) */
   if(lens->type != LEAF && lens->radius/d > para->OA || lens->Deltaz > para->sigz*(1.0+lens->point[0].x[2])){
     if( source->type != LEAF && source->radius/d > para->OA || source->Deltaz > para->sigz*(1.0+source->point[0].x[2])){
       gg(para,lens->Left,  source->Left,  SigR, weight, info, rank, size, 0, verbose);
@@ -726,7 +753,7 @@ void gg(Config *para, Node *lens, Node *source, double *SigR, double *weight, do
 }
 
 void corrLensSource(Config *para, Point lens, Point source, double d, double *SigR, double *weight, double *info){
-  /*See Leauthaud et al. (2010),  2010ApJ...709...97L */
+  /* See Leauthaud et al. (2010),  2010ApJ...709...97L */
   double dA, dR, AS, AL;
   double phi_gg, cos2phi_gg, sin2phi_gg, e1, e2, w;
   double fac, DOS, DOL, DLS, SigCritInv;
@@ -771,7 +798,7 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
     cos2phi_gg = cos(2.0*phi_gg);
     sin2phi_gg = sin(2.0*phi_gg);
     e1         =  source.e1*cos2phi_gg + source.e2*sin2phi_gg;
-    //e2         = -source.e1*sin2phi_gg + source.e2*cos2phi_gg;
+    e2         = -source.e1*sin2phi_gg + source.e2*cos2phi_gg;
     //Lens equation -----------------------------
     DOS        = dComo(source.x[2],para->a);/* Note this is a comoving los distance,         */ 
     DOL        = dComo(lens.x[2],para->a);  /* but redshift factors cancel out               */
@@ -784,9 +811,10 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
       weight[n+(para->nboots+1)*k]  += lens.boots[n]*w;
       SigR[n+(para->nboots+1)*k]    += lens.boots[n]*e1*w/SigCritInv;
     }
-    //keep track of Nsource per bin in this memory slot:
-    SigR[para->nbins*(para->nboots+1) + k] += 1.0;
-    info[0+para->Ninfo*k] += 1.0;
+    /* keep track of info per bin in this memory slot: */
+    info[0+para->Ninfo*k] += 1.0;             /* Nsources */
+    info[1+para->Ninfo*k] += dR*w;            /* mean R */
+    info[2+para->Ninfo*k] += e1*w/SigCritInv; /* e2       */
   }
   free_Point(A,1);
 }
@@ -797,10 +825,10 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
   static long *NN, total, count, fac;
   
   if(firstCall){
-    //Split tree among cpus
+    /* split tree among cpus */
     Node **node1Rank   = getNodesForCpu(para,node1,size,firstCall);
     node1 = node1Rank[rank];
-    //Initialization
+    /* initialization */
     NN = (long *)malloc(para->nbins*(para->nboots+1)*sizeof(long));
     for(i=0;i<para->nbins;i++){
        for(j=0;j<para->nboots+1;j++) NN[j+(para->nboots+1)*i] = 0;
@@ -808,7 +836,7 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
     total = node1->N[0]*node2->N[0]; 
     count = 0;
     fflush(stdout);
-    //if node1 and node2 are the same, only compute half of pairs
+    /* if node1 and node2 are the same, only compute half of pairs */
     fac = 1;
     if(node1->root == node2->root) fac = 2;
   }
@@ -836,10 +864,10 @@ long *Npairs(Config *para, Node *node1, Node *node2, int rank, int size,  int fi
     Npairs(para,node1,node2->Right, rank, size, 0, verbose);
   }else{
     if(para->proj == PHYS){
-      /* Angular diameter distance in comoving coordinates*/ 
-      dA  = dComo(node1->point[0].x[2],para->a)/(node1->point[0].x[2]+1.0); 
-      /* Transverse distance in phys coordinates (Mpc)    */
-      d   = d*dA*PI/180.0;                           
+      /* angular diameter distance in comoving coordinates */ 
+      dA = dComo(node1->point[0].x[2],para->a)/(node1->point[0].x[2]+1.0); 
+      /* transverse distance in phys coordinates (Mpc)     */
+      d  = d*dA*PI/180.0;                           
     }
     if(para->log) d = log(d);
     k = floor((d-para->min)/para->Delta);
@@ -1185,7 +1213,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.34\n\n\
+                (Super W Of Theta) MPI version 1.4\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\

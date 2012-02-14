@@ -1,8 +1,9 @@
--------------------------------------------------------------------------
-swot (Super W Of Theta)  mpi version                                     
--------------------------------------------------------------------------
+/*-------------------------------------------------------------------------*
+ *swot (Super W Of Theta)  mpi version                                     *
+ *Jean Coupon, Alexie Leauthaud (2012)                                     *
+ *-------------------------------------------------------------------------*
 
-Nov 29, 2011
+Feb 14, 2012
 
 Program to compute two-point correlation functions. Supports	
 auto and cross correlations and galaxy-galaxy lensing.
@@ -68,12 +69,12 @@ To compile it, you need to have mpicc installed on your
 machine. Please visit http://www.open-mpi.org/ for more 
 information. You also need the gsl library
 (http://www.gnu.org/software/gsl/). Then run:
->make
+> make
 If you want to use a different compiler than gcc (for example icc),
 you need first to build mpicc with the following command:
 (from intel website)
->./configure --prefix=/usr/local CC=icc CXX=icpc F77=ifort FC=ifort
->make all install
+> ./configure --prefix=/usr/local CC=icc CXX=icpc F77=ifort FC=ifort
+> make all install
 
 -------------------------------------------------------------------------
 Memory usage
