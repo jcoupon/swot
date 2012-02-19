@@ -45,6 +45,9 @@ Contributions:
   Alexie Leauthaud's code 
   (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
 
+v 1.41 Feb 19th 2012 [Alexie]
+- fixed a small bug with recording e2
+
 v 1.4 Feb 14th 2012 [Jean]
 - now displays <R>, e2 and Nsources
 - output file format is improved
@@ -814,7 +817,7 @@ void corrLensSource(Config *para, Point lens, Point source, double d, double *Si
     /* keep track of info per bin in this memory slot: */
     info[0+para->Ninfo*k] += 1.0;             /* Nsources */
     info[1+para->Ninfo*k] += dR*w;            /* mean R */
-    info[2+para->Ninfo*k] += e1*w/SigCritInv; /* e2       */
+    info[2+para->Ninfo*k] += e2*w/SigCritInv; /* e2       */
   }
   free_Point(A,1);
 }
@@ -1213,7 +1216,7 @@ int readPara(int argc, char **argv, Config *para){
     if(!strcmp(argv[i],"-h") || !strcmp(argv[i],"--help") || argc == 1){
       printf("\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.4\n\n\
+                (Super W Of Theta) MPI version 1.41\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
