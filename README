@@ -3,10 +3,14 @@
  *Jean Coupon, Alexie Leauthaud (2012)                                     *
  *-------------------------------------------------------------------------*
 
-Feb 14, 2012
+April 3rd, 2012
 
-Program to compute two-point correlation functions. Supports	
-auto and cross correlations and galaxy-galaxy lensing.
+Program to compute two-point correlation functions based on 
+"divide and conquer" algorithms, mainly, but not limited to:
+- data storage in a binary tree, 
+- approximation at large scale,
+- parellelization.
+Supports auto and cross correlations and galaxy-galaxy lensing
 
 Contributions:
 - The algorithm to compute the number of pairs from a tree is 
@@ -21,14 +25,13 @@ Usage:  mpirun -np [Ncpu] swot -c configFile [options]: run the program
 
 Important: if using "RADEC" coordinates, the angle
 in the input catalogues must be in decimal degrees.
-Output format: coord corr(coord) corr_err + [pair_numbers]
 
 -------------------------------------------------------------------------
 swot (Super W Of Theta)  mpi version                                     
 -------------------------------------------------------------------------
 
 * w(theta):
-swot -c test/auto.para
+swot -c test/auto.para [-corr cross]
 
 * Gal-gal lensing
 swot -c test/gglens.para
@@ -80,10 +83,9 @@ you need first to build mpicc with the following command:
 Memory usage
 -------------------------------------------------------------------------
 
-The code requires a large amount of memory to store the entire tree. As a rule
-of thumb, a catalogue with one million objects will take about 1GB...per cpu !!!
-To reduce the memory usage one can reduce the number of bootstraps samples 
-(-nboots 10) for example.
+To reduce the memory usage one can reduce the number of resamplings samples 
+(-nsamples 8) for example, but the covariance matrix is likely to be 
+inaccurate
 
 Maximum efficiency is reached when the number of cpus is a power of two.
 

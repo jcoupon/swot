@@ -3,21 +3,22 @@
 #Input catalogues                                          #
 #----------------------------------------------------------#
 data1          test/lenses.cat  #input data catalogue #1
-cols1          1,2,3,4	  #Column ids for data1
-data2          test/sources.cat  #input data catalogue #2
-cols2          1,2,3,4,5,6,7	  #Column ids for data2
-coord          RADEC	  #Coordinates: RADEC (in deg) or CART
+cols1          1,2,3,4	  	#Column ids for data1
+ran1           test/sources.cat	#input random catalogue #1
+rancols1       1,2,3,4,5,6,7	#Column ids for ran1
+coord          RADEC	  	#Coordinates: RADEC (in deg) or CART
 #----------------------------------------------------------#
 #Correlation options                                       #
 #----------------------------------------------------------#
 corr           gglens	 #Type of correlation: auto, cross or gglens
-range          30e-3,3	 #Correlation range
+range          40e-3,5	 #Correlation range
 nbins          10	 #Number of bins
 log            yes	 #Logarithmic bins (yes or no)
-nboots         0	 #Number of bootstrap samples
+err            jackknife #Resampling method (bootstrap or jackknife)
+nsamples       32	 #Number of samples
 OA             0.05	 #Open angle for approximation
 #----------------------------------------------------------#
-#Cosmology (for gal-gal correlations)                      #
+#Cosmology (for gal-gal correlations) and w(R)             #
 #----------------------------------------------------------#
 H0             72	 #Hubble parameter
 Omega_M        0.258	 #Relative matter density
@@ -28,5 +29,5 @@ proj           como	 #Axis projection (or phys)
 #Output options                                            #
 #----------------------------------------------------------#
 out            corr.out	 #Output file: coord corr(coord) corr_err
-cov            no	 #Covariance matrix of bootstrap errors (yes or no)
+cov            no	 #Covariance matrix of errors (yes or no)
 cov_out        cov.out	 #Covariance output file

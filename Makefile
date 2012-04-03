@@ -1,11 +1,10 @@
-CC=mpicc
-CFLAGS= 
-CFLAGS= -I$(HOME)/local/include 
-#LDFLAGS=-lm
-LDFLAGS=-L$(HOME)/local/lib -lm -lmpi -lgsl -lgslcblas #-lfftw3 
-EXEC=swot
-SRC=  main.c
-OBJ= $(SRC:.c=.o)
+
+CC      = mpicc	
+CFLAGS  = -I$(HOME)/local/include 
+LDFLAGS = -L$(HOME)/local/lib -lm -lmpi -lgsl -lgslcblas #-lfftw3 
+EXEC    = swot
+SRC     = main.c
+OBJ     = $(SRC:.c=.o)
 
 all: $(EXEC)
 
