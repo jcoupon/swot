@@ -17,23 +17,11 @@
  * - Make an option to save binary file of source tree (make an 
  *   option to read it in next time..). Only really need to compute 
  *   the source tree once because this never changes 
- *   [edit: the computation of the tree is now much faster. Postpone this
- *   option?]
- * 
- * NOTE: the code now computes the boostrap or jackknife 
- * with subarea (or sub volumes...which is better to be tested)
- * so are all of these options below necessary?
- * - Fast option version for randoms: for randoms we don't need e2, 
- *   nsource, don't need r_moyen ...Also randoms does not need bootstrap.
- * - For randoms: read in a list of 50 different random files (these will 
- *   be pre-computed). Only calcualte the source tree once. Only calculate 
- *   DOL once (randoms will all have same set of z).
  * - Do the randoms one by one or all together at once? -> Still need 
  *   to decide this question.
  * - For the randoms: will give a **list** of files in input; for each 
  *   random computed, writes output: [long term requirement if a single sample 
  *   takes ages to be computed] store nodes completed + sum of pairs  every day ?  
- * 
  * 
  *Contributions:
  *- the algorithm to compute the number of pairs from a tree is 
@@ -44,6 +32,11 @@
  *  (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
  *
  *Versions:
+ *
+ *v 0.11 April 4th [Jean]
+ * - data2 for sources catalogue
+ * - more details in swot -d, -o now works
+ * - no approx.: -OA no
  *
  *v 0.1 April 3rd [Jean]
  *- version from the old - memory monster - one.
@@ -454,7 +447,7 @@ void ggCorr(Config para){
   
   /* read files */
   if(para.rank == MASTER){
-    comment(para,"Reading sources file..."); source = readCat(para, para.fileRanName1, para.ran1Id);
+    comment(para,"Reading sources file..."); source = readCat(para, para.fileInName2, para.data2Id);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd sources found).\n", source.N);}
     
     comment(para,"Reading lenses file...."); lens   = readCat(para, para.fileInName1, para.data1Id);
@@ -1467,7 +1460,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.1\n\n	\
+                (Super W Of Theta) MPI version 0.11\n\n	\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -1480,7 +1473,7 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
     if(!strcmp(argv[i],"-d")){
       printf("#Configuration file for %s\n",MYNAME);
       printf("#----------------------------------------------------------#\n");
-      printf("#Input catalogues                                          #\n");
+      printf("#Input catalogues  (input coordinates in degrees)          #\n");
       printf("#----------------------------------------------------------#\n");
       printf("data1          %s  #input data catalogue #1\n",    para->fileInName1);
       printf("cols1          %d,%d\t  #Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
@@ -1496,12 +1489,13 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       printf("#----------------------------------------------------------#\n");
       printf("corr           auto\t #Type of correlation: auto, cross or gglens\n");
       printf("est            ls\t #Estimator: ls, nat, ham\n");
-      printf("range          %g,%g\t #Correlation range\n",para->min,para->max);
+      printf("range          %g,%g\t #Correlation range (in degrees for auto\n",para->min,para->max);
+      printf("                    \t #and corr, in Mpc for gglens)\n");
       printf("nbins          %d\t #Number of bins\n",para->nbins);
       printf("log            yes\t #Logarithmic bins (yes or no)\n");
       printf("err            jackknife #Resampling method (bootstrap or jackknife)\n");
-      printf("nsamples       %d\t #Number of samples\n",para->nsamples);
-      printf("OA             %g\t #Open angle for approximation\n",para->OA);
+      printf("nsamples       %d\t #Number of samples for resampling (power of 2)\n",para->nsamples);
+      printf("OA             %g\t #Open angle for approximation (value or \"no\") \n",para->OA);
       printf("proj           theta\t #Axis projection (or phys)\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Cosmology (for gal-gal correlations) and w(R)             #\n");
@@ -1667,7 +1661,8 @@ void setPara(char *field, char *arg, Config *para){
     para->nsamples = atoi(arg);
   }else if(!strcmp(field,"OA")){
     checkArg(field,arg,para);
-    para->OA     = atof(arg);
+    if(!strcmp(arg,"no")) para->OA = -1.0;
+    else para->OA     = atof(arg);
   }else if(!strcmp(field,"H0")){
     checkArg(field,arg,para);
     para->a[0]   = atof(arg);
@@ -1680,7 +1675,7 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"sigz")){
     checkArg(field,arg,para);
     para->sigz   = atof(arg);
-  }else if(!strcmp(field,"out") || !strcmp(field,"-o")){
+  }else if(!strcmp(field,"out") || !strcmp(field,"o")){
     checkArg(field,arg,para);
     strcpy(para->fileOutName,arg);
   }else if(!strcmp(field,"cov")){
