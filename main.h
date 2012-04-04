@@ -164,7 +164,7 @@ typedef struct Config
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
     corr, coordType, log, Ninfo, proj;
-  double sigz, min, max, Delta, OA;        
+  double deltaz, min, max, Delta, OA;        
   
   /* error method JACKKNIFE or BOOTSTRAP */
   int err, nsamples;

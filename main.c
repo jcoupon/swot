@@ -750,7 +750,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
   
   if(para->log) dR = log(dR);
   k = floor((dR - para->min)/para->Delta);
-  if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source){
+  if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens+para->deltaz){
     //if(0 <= k && k < para->nbins){
     /* Point A --------------------------------- */
     Point A = createPoint(*para, 1);
@@ -1411,9 +1411,9 @@ void initPara(int argc, char **argv, Config *para){
   strcpy(para->fileRanName2,"ran2.cat");
   /* colum ids, default: 
      ids           1  2   3   4   5  6  7 
-     [lensing]     RA DEC z  sigz e1 e2 weight 
+     [lensing]     RA DEC z  deltaz e1 e2 weight 
      [w(theta)]    RA DEC             
-     [wp(rp)]      RA DEC z  sigz             
+     [wp(rp)]      RA DEC z  deltaz             
      [xi(r)]       X  Y   Z (Mpc) */
   for(i=0;i<NIDSMAX;i++){ 
     para->data1Id[i] = i+1;
@@ -1435,7 +1435,7 @@ void initPara(int argc, char **argv, Config *para){
   para->nsamples  = 32;
   para->err       = JACKKNIFE;
   para->cov_mat   = 0;
-  para->sigz      = 0.03;
+  para->deltaz      = 0.03;
   strcpy(para->fileOutName,   "corr.out");
   strcpy(para->fileCovOutName,"cov.out");
   
@@ -1503,7 +1503,7 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       printf("H0             %g\t #Hubble parameter\n",para->a[0]);
       printf("Omega_M        %g\t #Relative matter density\n",para->a[1]);
       printf("Omega_L        %g\t #Relative energy density (Lambda)\n",para->a[2]);
-      printf("sigz           %g\t #Redshift accuracy\n",para->sigz);
+      printf("deltaz           %g\t #For gg lensing: Zsource > Zlens + deltaz\n",para->deltaz);
       printf("#proj           como\t #Axis projection (or phys)\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Output options                                            #\n");
@@ -1672,9 +1672,9 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"Omega_L")){
     checkArg(field,arg,para);
     para->a[2]   = atof(arg);
-  }else if(!strcmp(field,"sigz")){
+  }else if(!strcmp(field,"deltaz")){
     checkArg(field,arg,para);
-    para->sigz   = atof(arg);
+    para->deltaz   = atof(arg);
   }else if(!strcmp(field,"out") || !strcmp(field,"o")){
     checkArg(field,arg,para);
     strcpy(para->fileOutName,arg);
@@ -2050,7 +2050,7 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX]){
       if(para.corr == GGLENS){
 	Ncol -= 4;
 	//Check for positive values here ??
-	//TO DO add sigz if definied in para file
+	//TO DO add deltaz if definied in para file
 	data.zerr[n] = getDoubleValue(item,id[NDIM+0]);
 	data.e1[n]   = getDoubleValue(item,id[NDIM+1]);
 	data.e2[n]   = getDoubleValue(item,id[NDIM+2]);
