@@ -23,7 +23,7 @@ OA             0.05	 #Open angle for approximation
 H0             72	 #Hubble parameter
 Omega_M        0.258	 #Relative matter density
 Omega_L        0.742	 #Relative energy density (Lambda)
-sigz           0.03	 #Redshift accuracy
+deltaz         0.00	 #For gg lensing: Zsource > Zlens + deltaz
 proj           como	 #Axis projection (or phys)
 #----------------------------------------------------------#
 #Output options                                            #

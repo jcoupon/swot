@@ -1674,7 +1674,7 @@ void setPara(char *field, char *arg, Config *para){
     para->a[2]   = atof(arg);
   }else if(!strcmp(field,"deltaz")){
     checkArg(field,arg,para);
-    para->deltaz   = atof(arg);
+    para->deltaz  = atof(arg);
   }else if(!strcmp(field,"out") || !strcmp(field,"o")){
     checkArg(field,arg,para);
     strcpy(para->fileOutName,arg);
