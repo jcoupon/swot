@@ -163,7 +163,6 @@ void autoCorr(Config para){
     double *wmean = (double *)malloc(para.nbins*sizeof(double));
     double *err_r = (double *)malloc(para.nbins*sizeof(double));
     double *err_p = (double *)malloc(para.nbins*sizeof(double));
-    double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
     
     double norm;
     switch(para.err){
@@ -220,30 +219,33 @@ void autoCorr(Config para){
     fclose(fileOut);
     
     /* covariance matrix */
-    FILE *fileCovOut = fopen(para.fileCovOutName,"w");
-    for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
-    for(i=0;i<para.nbins;i++){
-      for(j=0;j<para.nbins;j++){
-	for(l=0;l<para.nsamples;l++){
-	  cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1))*(wmean[j]-wTheta(para, para.estimator, DD, RR, DR, DR, j, l+1));
+    if(para.cov_mat){ 
+      double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+      FILE *fileCovOut = fopen(para.fileCovOutName,"w");
+      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
+      for(i=0;i<para.nbins;i++){
+	for(j=0;j<para.nbins;j++){
+	  for(l=0;l<para.nsamples;l++){
+	    cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1))*(wmean[j]-wTheta(para, para.estimator, DD, RR, DR, DR, j, l+1));
+	  }
+	  /* add poisson error to diagonal */
+	  if(i==j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
+	  /* write outfile */
+	  if(DD.NN[i] > 0 && RR.NN[i] > 0 && DD.NN[j] > 0 && RR.NN[j] > 0){
+	    fprintf(fileCovOut,"%g ", cov[para.nbins*i+j]);
+	  }else{
+	    fprintf(fileCovOut,"%f ", 0.0);
+	  }
 	}
-	/* add poisson error to diagonal */
-	if(i==j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
-	/* write outfile */
-	if(DD.NN[i] > 0 && RR.NN[i] > 0 && DD.NN[j] > 0 && RR.NN[j] > 0){
-	  fprintf(fileCovOut,"%g ", cov[para.nbins*i+j]);
-	}else{
-	  fprintf(fileCovOut,"%f ", 0.0);
-	}
+	fprintf(fileCovOut,"\n");
       }
-      fprintf(fileCovOut,"\n");
+      fclose(fileCovOut);
+      free(cov);
     }
-    fclose(fileCovOut);
     
     free(wmean);
     free(err_r);
     free(err_p);
-    free(cov);
   }
   
   freeResult(para, RR);
@@ -340,7 +342,6 @@ void crossCorr(Config para){
     double *wmean = (double *)malloc(para.nbins*sizeof(double));
     double *err_r = (double *)malloc(para.nbins*sizeof(double));
     double *err_p = (double *)malloc(para.nbins*sizeof(double));
-    double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
     
     double norm;
     switch(para.err){
@@ -398,30 +399,33 @@ void crossCorr(Config para){
     fclose(fileOut);
     
     /* covariance matrix */
-    FILE *fileCovOut = fopen(para.fileCovOutName,"w");
-    for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
-    for(i=0;i<para.nbins;i++){
-      for(j=0;j<para.nbins;j++){
-	for(l=0;l<para.nsamples;l++){
-	  cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, l+1))*(wmean[j]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, j, l+1));
+    if(para.cov_mat){ 
+      double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+      FILE *fileCovOut = fopen(para.fileCovOutName,"w");
+      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
+      for(i=0;i<para.nbins;i++){
+	for(j=0;j<para.nbins;j++){
+	  for(l=0;l<para.nsamples;l++){
+	    cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, l+1))*(wmean[j]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, j, l+1));
+	  }
+	  /* add poisson error to diagonal */
+	  if(i==j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
+	  /* write outfile */
+	  if(D1D2.NN[i] > 0 && R1R2.NN[i] > 0 && D1D2.NN[j] > 0 && R1R2.NN[j] > 0){
+	    fprintf(fileCovOut,"%g ", cov[para.nbins*i+j]);
+	  }else{
+	    fprintf(fileCovOut,"%f ", 0.0);
+	  }
 	}
-	/* add poisson error to diagonal */
-	if(i==j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
-	/* write outfile */
-	if(D1D2.NN[i] > 0 && R1R2.NN[i] > 0 && D1D2.NN[j] > 0 && R1R2.NN[j] > 0){
-	  fprintf(fileCovOut,"%g ", cov[para.nbins*i+j]);
-	}else{
-	  fprintf(fileCovOut,"%f ", 0.0);
-	}
+	fprintf(fileCovOut,"\n");
       }
-      fprintf(fileCovOut,"\n");
+      fclose(fileCovOut);
+      free(cov);
     }
-    fclose(fileCovOut);
     
     free(wmean);
     free(err_r);
     free(err_p);
-    free(cov);
   }
   
   freeResult(para, R1R2);
@@ -506,18 +510,20 @@ void ggCorr(Config para){
     
     double R, meanR;
     FILE *fileOut = fopen(para.fileOutName,"w");
-    fprintf(fileOut,"#Gal-gal lensing. Sigma(R) vs R, linear approximation\n");
+    fprintf(fileOut, "#Gal-gal lensing. Sigma(R) vs R, linear approximation\n");
     switch(para.err){
     case JACKKNIFE: fprintf(fileOut, "#Resampling: jackknife (%d samples)\n", para.nsamples); break;
     case BOOTSTRAP: fprintf(fileOut, "#Resampling: bootstrap (%d samples)\n", para.nsamples); break;
     }
     switch(para.proj){
-    case PHYS:  fprintf(fileOut,"#Coordinates: physical\n"); break;
-    case COMO:  fprintf(fileOut,"#Coordinates: comoving\n"); break;
+    case PHYS:  fprintf(fileOut, "#Coordinates: physical\n"); break;
+    case COMO:  fprintf(fileOut, "#Coordinates: comoving\n"); break;
     }
-    fprintf(fileOut,"#  R(Mpc)  SigR(Msun/pc^2) err(weights) err(resampling) Nsources       <R>          e2\n");
+    fprintf(fileOut, "#Cosmolgy: H0 = %g, Omega_M = %g, Omega_L = %g\n", para.a[0], para.a[1], para.a[2]);
+    fprintf(fileOut, "#  R(Mpc)  SigR(Msun/pc^2) err(weights) err(resampling) Nsources       <R>          e2\n");
     for(i=0;i<para.nbins;i++){
       /* reminder: non-resampled value are stored from i=0 to nbins - 1 in result.w and result.GG */
+      
       /* R and Rmean (weighted) */
       if(para.log){ 
 	R     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
@@ -526,6 +532,7 @@ void ggCorr(Config para){
 	R     = para.min+para.Delta*(double)i+para.Delta/2.0;
 	meanR = result.meanR[i]/result.w[i];
       }
+      
       /* don't divide by zero if there are too few objects in the bin */
       if(result.Nsources[i] > 3.0){
 	fprintf(fileOut,"%12.7f %12.7f %12.7f %12.7f %15zd %12.7f %12.7f\n", 
@@ -541,6 +548,29 @@ void ggCorr(Config para){
     }
     
     fclose(fileOut);
+    
+    /* covariance matrix */
+    if(para.cov_mat){ 
+      double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+      FILE *fileCovOut = fopen(para.fileCovOutName,"w");
+      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
+      for(i=0;i<para.nbins;i++){
+	for(j=0;j<para.nbins;j++){
+	  for(l=0;l<para.nsamples;l++){
+	    cov[para.nbins*i+j] += norm*(GG_mean[i] + result.GG[para.nbins*(l+1)+i]/result.w[para.nbins*(l+1)+i])*(GG_mean[j] + result.GG[para.nbins*(l+1)+j]/result.w[para.nbins*(l+1)+j]);
+	  }
+	  /* write outfile */
+	  if(result.Nsources[i] > 3.0 && result.Nsources[j] > 3.0){
+	    fprintf(fileCovOut,"%g ", cov[para.nbins*i+j]);
+	  }else{
+	    fprintf(fileCovOut,"%f ", 0.0);
+	  }
+	}
+	fprintf(fileCovOut,"\n");
+      }
+      fclose(fileCovOut);
+      free(cov);
+    }
   }
   
   freeResult(para, result);
@@ -750,8 +780,8 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
   
   if(para->log) dR = log(dR);
   k = floor((dR - para->min)/para->Delta);
-  if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens+para->deltaz){
-    //if(0 <= k && k < para->nbins){
+  if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens + para->deltaz){
+  //DEBUGGING if(0 <= k && k < para->nbins && z_source > z_lens + 0.1){
     /* Point A --------------------------------- */
     Point A = createPoint(*para, 1);
     A.x[0]    = RA_source;
@@ -1435,11 +1465,11 @@ void initPara(int argc, char **argv, Config *para){
   para->nsamples  = 32;
   para->err       = JACKKNIFE;
   para->cov_mat   = 0;
-  para->deltaz      = 0.03;
+  para->deltaz    = 0.03;
   strcpy(para->fileOutName,   "corr.out");
   strcpy(para->fileCovOutName,"cov.out");
   
-  /* only master talks  */
+  /* only master talks */
   if(para->rank == MASTER){
     para->verbose = 1;    
   }else{
