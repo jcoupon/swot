@@ -9,7 +9,7 @@
  *- data storage in a binary tree, 
  *- approximation at large scale,
  *- parellelization.
- *Supports auto and cross correlations and galaxy-galaxy lensing.
+ *Supports auto and cross correlations, and galaxy-galaxy lensing.
  * 
  *TO DO:
  * - option to take into account the East-West orientation
@@ -32,6 +32,10 @@
  *  (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
  *
  *Versions:
+ *
+ *v 0.12 May 1st [Jean]
+ * - xi(r) 3D added (option -coord CART3D)
+ * - default parameter file (swot -d) improved
  *
  *v 0.11 April 4th [Jean]
  * - data2 for sources catalogue
@@ -142,6 +146,14 @@ void autoCorr(Config para){
   long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
   long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
 
+  /* DEBUGGING
+  if(para.verbose){
+    para.rank = 3;
+    nodeSlaveData  = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
+    printTree(para, para.fileOutName, dataTree, nodeSlaveData, 1, FIRSTCALL);
+    exit(-1);
+  }*/
+  
   /* compute pairs */
   comment(para, "RR...       "); RR = Npairs(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
   comment(para, "DR...       "); DR = Npairs(&para, &dataTree,   ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
@@ -656,7 +668,6 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
     Npairs(para, tree1, i, tree2, tree2->left[j],   0); 
     Npairs(para, tree1, i, tree2,  tree2->right[j], 0); 
   }else{
-    
     if(para->log) deltaTheta = log(deltaTheta);
     k = floor((deltaTheta - para->min)/para->Delta);
     if(0 <= k && k < para->nbins){
@@ -668,7 +679,6 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
     }
     count += tree1->N[i]*tree2->N[j];
     printCount(count,total,10000,para->verbose);
-    
   }
   
   if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
@@ -936,7 +946,12 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   
   /* compute node radius "r" for the open-angle approximation. r is defined as
    * the distance between the weighted center and the most distant point (angular 
-   * separation). For speed purpose, the test uses the cartesian approximation.
+   * separation). For speed purpose, the test uses the cartesian approximation, but 
+   * the distance is then estimated accuratly according to the coordinate system.
+   *
+   * For the sake of "code readability" we make the assumption that box size
+   * estimated on the projected coordinates should be a fair approximation 
+   * of the 3-D size.
    */
   dMax = 0.0; maxPoint = 0;
   for(n=0;n<data->N;n++){
@@ -1019,7 +1034,7 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
       
       if(para->nsamples > data->N){
 	if(para->verbose) 
-	  fprintf(stderr,"\n%s: **ERROR** nsamples must < Npoints. Exiting...\n", MYNAME);
+	  fprintf(stderr,"\n%s: **ERROR** nsamples must be < Npoints. Exiting...\n", MYNAME);
 	exit(EXIT_FAILURE);
       }
       
@@ -1113,7 +1128,8 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
     fprintf(fileOut,"%d \n", para.rank);
   }
   
-  if(firstCall) fclose(fileOut);
+  if(firstCall)  MPI_Barrier(MPI_COMM_WORLD);
+ 
 }
 
 void freeTree(const Config para, Tree tree){
@@ -1186,6 +1202,7 @@ double distAngPointCart(const Config *para, const Point *a, const long *i, const
   
   double d0 = (b->x[NDIM*(*j)+0] - a->x[NDIM*(*i)+0]);
   double d1 = (b->x[NDIM*(*j)+1] - a->x[NDIM*(*i)+1]);
+  
   return sqrt(d0*d0 + d1*d1);
 }
 
@@ -1223,6 +1240,19 @@ double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j){
   double d1 = (b->point.x[NDIM*(*j)+1] - a->point.x[NDIM*(*i)+1]);
   
   return sqrt(d0*d0 + d1*d1);
+}
+
+
+double dist3D(const Tree *a, const long *i, const Tree *b, const long *j){
+/*Returns the angular distance between nodes
+ * a[i] and b[j]. Cartesian coordinates in 3D.
+ */
+  
+  double d0 = (b->point.x[NDIM*(*j)+0] - a->point.x[NDIM*(*i)+0]);
+  double d1 = (b->point.x[NDIM*(*j)+1] - a->point.x[NDIM*(*i)+1]);
+  double d2 = (b->point.x[NDIM*(*j)+2] - a->point.x[NDIM*(*i)+2]);
+  
+  return sqrt(d0*d0 + d1*d1 + d2*d2);
 }
 
 
@@ -1490,7 +1520,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.11\n\n	\
+                (Super W Of Theta) MPI version 0.12\n\n	\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -1503,7 +1533,7 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
     if(!strcmp(argv[i],"-d")){
       printf("#Configuration file for %s\n",MYNAME);
       printf("#----------------------------------------------------------#\n");
-      printf("#Input catalogues  (input coordinates in degrees)          #\n");
+      printf("#Input catalogues                                          #\n");
       printf("#----------------------------------------------------------#\n");
       printf("data1          %s  #input data catalogue #1\n",    para->fileInName1);
       printf("cols1          %d,%d\t  #Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
@@ -1513,33 +1543,36 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       printf("rancols1       %d,%d\t  #Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
       printf("ran2           %s\t  #input random catalogue #2\n",para->fileRanName2);
       printf("rancols2       %d,%d\t  #Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
-      printf("coord          RADEC\t  #Coordinates: RADEC (in deg) or CART\n");
+      printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
+      printf("                    \t  #(in degrees if RADEC\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Correlation options                                       #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("corr           auto\t #Type of correlation: auto, cross or gglens\n");
-      printf("est            ls\t #Estimator: ls, nat, ham\n");
-      printf("range          %g,%g\t #Correlation range (in degrees for auto\n",para->min,para->max);
-      printf("                    \t #and corr, in Mpc for gglens)\n");
+      printf("corr           auto\t #Type of correlation: [auto,cross,gglens]\n");
+      printf("est            ls\t #Estimator [ls,nat,ham]\n");
+      printf("range          %g,%g\t #Correlation range. Unity same as \"coord\":\n",para->min,para->max);
+      printf("                    \t #in degrees for RADEC, in Mpc for gglens)\n");
       printf("nbins          %d\t #Number of bins\n",para->nbins);
-      printf("log            yes\t #Logarithmic bins (yes or no)\n");
-      printf("err            jackknife #Resampling method (bootstrap or jackknife)\n");
+      printf("log            yes\t #Logarithmic bins [yes,no]\n");
+      printf("err            jackknife #Resampling method [bootstrap,jackknife]\n");
       printf("nsamples       %d\t #Number of samples for resampling (power of 2)\n",para->nsamples);
       printf("OA             %g\t #Open angle for approximation (value or \"no\") \n",para->OA);
-      printf("proj           theta\t #Axis projection (or phys)\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Cosmology (for gal-gal correlations) and w(R)             #\n");
       printf("#----------------------------------------------------------#\n");
       printf("H0             %g\t #Hubble parameter\n",para->a[0]);
       printf("Omega_M        %g\t #Relative matter density\n",para->a[1]);
       printf("Omega_L        %g\t #Relative energy density (Lambda)\n",para->a[2]);
-      printf("deltaz           %g\t #For gg lensing: Zsource > Zlens + deltaz\n",para->deltaz);
-      printf("#proj           como\t #Axis projection (or phys)\n");
+      printf("deltaz         %g\t #For gg lensing: Zsource > Zlens + deltaz\n",para->deltaz);
       printf("#----------------------------------------------------------#\n");
       printf("#Output options                                            #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("out            %s\t #Output file: coord corr(coord) corr_err\n",para->fileOutName);
-      printf("cov            no\t #Covariance matrix of errors (yes or no)\n");
+      printf("proj           theta\t #Axis projection:\n");
+      printf("                    \t #if coord = RADEC, [phys,theta]\n");
+      printf("                    \t #if coord = CART3D, [phys] \n");
+      printf("                    \t #if corr = gglens, [como,phys]\n");
+      printf("out            %s\t #Output file\n",para->fileOutName);
+      printf("cov            no\t #Covariance matrix of errors [yes,no]\n");
       printf("cov_out        %s\t #Covariance output file\n",para->fileCovOutName);
       exit(EXIT_FAILURE);
     }
@@ -1588,6 +1621,10 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       break;
     case CART:
       para->distAng = &distAngCart;
+      break;
+    case CART3D:
+      NDIM = 3;
+      para->distAng = &dist3D;
       break;
     }
   
@@ -1649,8 +1686,9 @@ void setPara(char *field, char *arg, Config *para){
     for(j=0;j<Ncol;j++)  para->ran2Id[j] = getIntValue(list,j+1);
   }else if(!strcmp(field,"coord")) {
     checkArg(field,arg,para);
-    if(!strcmp(arg,"RADEC")) para->coordType = RADEC;
-    else if(!strcmp(arg,"CART"))  para->coordType = CART;
+    if(!strcmp(arg,"RADEC"))        para->coordType = RADEC;
+    else if(!strcmp(arg,"CART"))    para->coordType = CART;
+    else if(!strcmp(arg,"CART3D"))  para->coordType = CART3D;
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"corr")) {
     checkArg(field, arg, para);
@@ -2061,12 +2099,13 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX]){
     if(*(line) != '#' && *(line) != '\0' && *(line) != '\n') N++;
   rewind(fileIn);
   
+  
   if(N < para.size){
     /* if no point found in fileIn or if the number of 
      * points is less than the number of cpu (who knows...) 
      */
     if(para.verbose) fprintf(stderr,"\n%s: **ERROR** no valid point found in the file or too many cpus. Exiting...\n", MYNAME);
-    exit(EXIT_FAILURE);      
+    //  exit(EXIT_FAILURE);      
   }
   
   Point data = createPoint(para, N);

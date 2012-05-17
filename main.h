@@ -41,6 +41,7 @@
 #define EVEN        1
 #define RADEC       0
 #define CART        1
+#define CART3D      2
 #define COMO        0
 #define THETA       1
 #define PHYS        2
@@ -181,7 +182,7 @@ typedef struct Config
   char fileOutName[1000],  fileCovOutName[1000];
   
   /* column ids for input files */
-  int data1Id[NIDSMAX], data2Id[NIDSMAX];           
+  int data1Id[NIDSMAX], data2Id[NIDSMAX];
   int  ran1Id[NIDSMAX], ran2Id[NIDSMAX];
   
   /* angular separation function distAng[Spher,Cart] */
@@ -218,6 +219,7 @@ double distAngPointCart(const Config *para, const Point *a, const long *i, const
 double distAngPointSpher(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j);
 double distAngPoint(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
+double dist3D(const Tree *a, const long *i, const Tree *b, const long *j);
 
 /*----------------------------------------------------------------*
  * MPI routines                                                   *
