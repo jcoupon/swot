@@ -1543,22 +1543,22 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       printf("rancols1       %d,%d\t  #Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
       printf("ran2           %s\t  #input random catalogue #2\n",para->fileRanName2);
       printf("rancols2       %d,%d\t  #Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
-      printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
-      printf("                    \t  #(in degrees if RADEC\n");
+      printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D,RADEC_Z]\n");
+      printf("                    \t  #(in degrees if RADEC)\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Correlation options                                       #\n");
       printf("#----------------------------------------------------------#\n");
       printf("corr           auto\t #Type of correlation: [auto,cross,gglens]\n");
       printf("est            ls\t #Estimator [ls,nat,ham]\n");
       printf("range          %g,%g\t #Correlation range. Unity same as \"coord\":\n",para->min,para->max);
-      printf("                    \t #in degrees for RADEC, in Mpc for gglens)\n");
+      printf("                    \t #in degrees for RADEC, in Mpc otherwise)\n");
       printf("nbins          %d\t #Number of bins\n",para->nbins);
       printf("log            yes\t #Logarithmic bins [yes,no]\n");
       printf("err            jackknife #Resampling method [bootstrap,jackknife]\n");
       printf("nsamples       %d\t #Number of samples for resampling (power of 2)\n",para->nsamples);
       printf("OA             %g\t #Open angle for approximation (value or \"no\") \n",para->OA);
       printf("#----------------------------------------------------------#\n");
-      printf("#Cosmology (for gal-gal correlations) and w(R)             #\n");
+      printf("#Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))  #\n");
       printf("#----------------------------------------------------------#\n");
       printf("H0             %g\t #Hubble parameter\n",para->a[0]);
       printf("Omega_M        %g\t #Relative matter density\n",para->a[1]);
@@ -1569,8 +1569,8 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       printf("#----------------------------------------------------------#\n");
       printf("proj           theta\t #Axis projection:\n");
       printf("                    \t #if coord = RADEC, [phys,theta]\n");
-      printf("                    \t #if coord = CART3D, [phys] \n");
-      printf("                    \t #if corr = gglens, [como,phys]\n");
+      printf("                    \t #if coord = CART3D, RADEC_Z [phys] \n");
+      printf("                    \t #if corr  = gglens, [como,phys]\n");
       printf("out            %s\t #Output file\n",para->fileOutName);
       printf("cov            no\t #Covariance matrix of errors [yes,no]\n");
       printf("cov_out        %s\t #Covariance output file\n",para->fileCovOutName);
@@ -1617,6 +1617,10 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
   switch(para->coordType)
     {
     case RADEC:
+      para->distAng = &distAngSpher;
+      break;
+    case RADEC_Z:
+      NDIM = 3;
       para->distAng = &distAngSpher;
       break;
     case CART:
@@ -1687,6 +1691,7 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"coord")) {
     checkArg(field,arg,para);
     if(!strcmp(arg,"RADEC"))        para->coordType = RADEC;
+    else if(!strcmp(arg,"RADEC_Z"))    para->coordType = RADEC_Z;
     else if(!strcmp(arg,"CART"))    para->coordType = CART;
     else if(!strcmp(arg,"CART3D"))  para->coordType = CART3D;
     else checkArg(field, NULL, para);

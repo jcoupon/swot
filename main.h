@@ -42,6 +42,7 @@
 #define RADEC       0
 #define CART        1
 #define CART3D      2
+#define RADEC_Z     3
 #define COMO        0
 #define THETA       1
 #define PHYS        2
