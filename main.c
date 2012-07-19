@@ -14,14 +14,8 @@
  *TO DO:
  * - option to take into account the East-West orientation
  * - measure the tangential shear
- * - Make an option to save binary file of source tree (make an 
- *   option to read it in next time..). Only really need to compute 
- *   the source tree once because this never changes 
  * - Do the randoms one by one or all together at once? -> Still need 
- *   to decide this question.
- * - For the randoms: will give a **list** of files in input; for each 
- *   random computed, writes output: [long term requirement if a single sample 
- *   takes ages to be computed] store nodes completed + sum of pairs  every day ?  
+ *   to decide this question. NOT URGENT
  * 
  *Contributions:
  *- the algorithm to compute the number of pairs from a tree is 
