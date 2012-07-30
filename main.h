@@ -42,13 +42,13 @@
 #define RADEC       0
 #define CART        1
 #define CART3D      2
-#define RADEC_Z     3
 #define COMO        0
 #define THETA       1
 #define PHYS        2
 #define CROSS       0
 #define AUTO        1
 #define GGLENS      2
+#define AUTO_WP     3
 #define LS          0
 #define NAT         1
 #define HAM         2
@@ -198,9 +198,12 @@ typedef struct Config
 void autoCorr(Config para);
 void crossCorr(Config para);
 void ggCorr(Config para);
+void autoCorr_wp(Config para);
 
 double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l);
+double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l);
 Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
+Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
 Result gg(const Config *para,const Tree *lens, const long i, const Tree *source, const long j, int firstCall);
 void corrLensSource(const Config *para, const Tree *lens, long i, const Tree *source, long j, double deltaTheta, Result result);
 void freeResult(const Config para, Result result);

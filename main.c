@@ -12,6 +12,13 @@
  *Supports auto and cross correlations, and galaxy-galaxy lensing.
  * 
  *TO DO:
+ * - remove coord option, or try to make more simple: corr: 
+ * auto_wtheta, cross_wtheta, auto_wp, cross_wp, auto_3D, cross_3D, gglens
+ * - update README file
+ * - make a default file for each type of correlation
+ * - approximation at large scale for 3D and wp based on physical distance
+ * - add weight for w(theta)
+ * - compute tangential shear
  * - option to take into account the East-West orientation
  * - measure the tangential shear
  * - Do the randoms one by one or all together at once? -> Still need 
@@ -26,6 +33,10 @@
  *  (see  Leauthaud et al. (2010),  2010ApJ...709...97L).
  *
  *Versions:
+ *
+ *v 0.13 July 30st [Jean]
+ * - implemented wp(rp) - but only for testing purposes so far
+ * - set -corr auto_wp for computing wp(rp)
  *
  *v 0.12 May 1st [Jean]
  * - xi(r) 3D added (option -coord CART3D)
@@ -81,6 +92,10 @@ int main(argc,argv)
   case GGLENS:
     /* galaxy-galaxy lensing two-point cross-correlation function */
     ggCorr(para);
+    break;
+  case AUTO_WP:
+    /* two-point autocorrelation function */
+    autoCorr_wp(para);
     break;
   }
   
@@ -152,7 +167,7 @@ void autoCorr(Config para){
   comment(para, "RR...       "); RR = Npairs(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
   comment(para, "DR...       "); DR = Npairs(&para, &dataTree,   ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
   comment(para, "DD...       "); DD = Npairs(&para, &dataTree,   ROOT, &dataTree,   nodeSlaveData, FIRSTCALL);
-    
+  
   freeMask(para, mask);
   freeTree(para, randomTree);
   freeTree(para, dataTree);
@@ -492,7 +507,7 @@ void ggCorr(Config para){
   
   /* print out results */
   if(para.rank == MASTER){
-    
+     
     /* resampling errors */
     double norm;
     switch(para.err){
@@ -585,6 +600,148 @@ void ggCorr(Config para){
 }
 
 
+
+void autoCorr_wp(Config para){
+  /* Computes the auto correlation function.
+   * for autocorrelation, each cpu correlates all nodes from the root 
+   * with all nodes from a subnode (which is only a part of the tree).
+   */
+  
+  int dimStart = 0;
+  long i, j, k, l, n;
+  Point data, random;
+  Tree dataTree, randomTree;
+  Result DD, DR, RR;
+  Mask mask;
+  
+  /* read files */
+  if(para.rank == MASTER){
+    comment(para,"Reading fileRan1..."); random = readCat(para, para.fileRanName1, para.ran1Id);
+    if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random.N);}
+    
+    comment(para,"Reading fileIn1....");  data  = readCat(para, para.fileInName1, para.data1Id);
+    if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data.N);}
+  }  
+  
+  /* resample, build masks */
+  comment(para, "Resampling...");
+  resample(&para, &random, dimStart, &mask, FIRSTCALL);
+  
+  /* send data */
+  comment(para, "sending data...");  
+  comData(para, &random, 0, dimStart, FIRSTCALL);
+  comData(para, &data  , 0, dimStart, FIRSTCALL);
+  
+  /* grow trees */
+  comment(para, "building trees...");
+  randomTree = buildTree(&para, &random, &mask, dimStart, FIRSTCALL);   freePoint(para, random);
+  dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
+  
+  comment(para, "done.\n");
+  
+  /* divide and conquer */
+  long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
+  long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
+
+  /* DEBUGGING
+  if(para.verbose){
+    para.rank = 3;
+    nodeSlaveData  = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
+    printTree(para, para.fileOutName, dataTree, nodeSlaveData, 1, FIRSTCALL);
+    exit(-1);
+  }*/
+  
+  /* compute pairs */
+  comment(para, "RR...       "); RR = Npairs3D(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
+  comment(para, "DR...       "); DR = Npairs3D(&para, &dataTree,   ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
+  comment(para, "DD...       "); DD = Npairs3D(&para, &dataTree,   ROOT, &dataTree,   nodeSlaveData, FIRSTCALL);
+  
+  freeMask(para, mask);
+  freeTree(para, randomTree);
+  freeTree(para, dataTree);
+  
+  /* each slave sends the result and master sums everything up */
+  comResult(para, RR, para.size, 0);
+  comResult(para, DR, para.size, 0);
+  comResult(para, DD, para.size, 0);
+  
+  /* print out results */
+  if(para.rank == MASTER){
+    
+    /* mean wp and errors */
+    double *wmean = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+    double *err_r = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+    double *err_p = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+    
+    double norm;
+    switch(para.err){
+    case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
+    case BOOTSTRAP: norm = 1.0/(double)(para.nsamples - 1); break;
+    }										  
+    
+    /* w(theta) errors */
+    for(i=0;i<para.nbins;i++){
+      for(j=0;j<para.nbins;j++){
+	wmean[j+para.nbins*i] = err_r[j+para.nbins*i] = 0.0;
+	if(para.nsamples > 1){
+	  for(l=0;l<para.nsamples;l++) wmean[j+para.nbins*i] += wp(para, para.estimator, DD, RR, DR, DR, i, j, l+1)/(double)para.nsamples;
+	  for(l=0;l<para.nsamples;l++) err_r[j+para.nbins*i] += SQUARE(wmean[j+para.nbins*i]-wp(para, para.estimator, DD, RR, DR, DR, i, j, l+1));
+	  /* resampling error */
+	  err_r[j+para.nbins*i] = sqrt(norm*err_r[j+para.nbins*i]);
+	}
+	/* poisson error ~1/N */
+	err_p[j+para.nbins*i] = ABS(1.0+wp(para, para.estimator, DD, RR, DR, DR, i, j, 0))*(1.0/sqrt((double)DD.NN[j + para.nbins*(i + para.nbins*0)]) + 1.0/sqrt((double)RR.NN[j + para.nbins*(i + para.nbins*0)]));
+      }
+    }
+    
+    /* R */
+    double *R = (double *)malloc(para.nbins*sizeof(double));
+    for(i=0;i<para.nbins;i++){
+      if(para.log){
+	R[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+      }else{
+	R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
+      }
+    }
+        
+    double *wp_rp = (double *)malloc(para.nbins*sizeof(double));
+    for(j=0;j<para.nbins;j++) wp_rp[j] = 0.0;
+    for(j=0;j<para.nbins;j++){
+      for(i=0;i<para.nbins;i++){
+	wp_rp[j] += wp(para, para.estimator, DD, RR, DR, DR, i, j, 0)*R[i]*para.Delta;
+      }
+    }
+    
+    FILE *fileOut = fopen(para.fileOutName,"w");
+    for(j=0;j<para.nbins;j++){
+      fprintf(fileOut, "%12.7f %12.7f\n", R[j], wp_rp[j]);
+    }
+      
+
+    /*
+    for(i=0;i<para.nbins;i++){
+      for(j=0;j<para.nbins;j++){
+	fprintf(fileOut, "%12.7f ", wp(para, para.estimator, DD, RR, DR, DR, i, j, 0));
+	// fprintf(fileOut, "%12.7f ", (double)RR.NN[j + para.nbins*(i + para.nbins*0)]);
+      }
+      fprintf(fileOut, " \n");
+    }
+    */
+    
+    fclose(fileOut);
+    
+    free(wmean);
+    free(err_r);
+    free(err_p);
+  }
+  
+  freeResult(para, RR);
+  freeResult(para, DR);
+  freeResult(para, DD);
+  
+  return;
+}
+
 double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l){
   /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
   
@@ -607,6 +764,35 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
     break;
   case HAM: /* Hamilton */
     result = Norm4*(double)D1D2.NN[para.nbins*l+i]*(double)R1R2.NN[para.nbins*l+i]/((double)D1R1.NN[para.nbins*l+i]*(double)D2R2.NN[para.nbins*l+i]) - 1.0;
+    break;
+  }
+  
+  return result;
+}
+
+
+double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l){
+  /* i,j are the bin indexes. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
+  
+  /* initialization */
+  double Norm1 = (double)(R1R2.N1[l]*(R1R2.N2[l]-1))/(double)(D1D2.N1[l]*(D1D2.N2[l]-1));
+  double Norm2 = (double)(R1R2.N2[l]-1)/(double)D1D2.N1[l];
+  double Norm3 = (double)(R1R2.N1[l]-1)/(double)D1D2.N2[l];
+  double Norm4 = (double)(D1D2.N2[l]*R1R2.N2[l])/(double)((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+  
+  double result;
+
+  switch(estimator){
+  case LS:  /* Landy and Szalay */
+    result  =  Norm1*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)];
+    result += -Norm2*(double)D1R1.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)];
+    result += -Norm3*(double)D2R2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)] + 1.0;
+    break;
+  case NAT: /* Natural */
+    result = Norm1*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
+    break;
+  case HAM: /* Hamilton */
+    result = Norm4*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]*(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)]/((double)D1R1.NN[j + para.nbins*(i + para.nbins*l)]*(double)D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
     break;
   }
   
@@ -683,6 +869,87 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
   
   return result;
 }
+
+
+Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall){ 
+  /* returns the number of pairs if tree1 != tree2, and twice 
+   * the number of pairs if tree1 == tree2, so that the treatment of pairs 
+   * in w(theta) estimators is identical (numerical trick).
+   */
+  
+  long NN, k = 0, m = 0, l;
+  static Result result;
+  static long count, total;
+  double deltaTheta, rp, pi;
+  
+  if(firstCall){
+    count = 0;
+    total = tree1->N[i]*tree2->N[j];
+    result.NN = (long *)malloc(para->nbins*para->nbins*(para->nsamples+1)*sizeof(long));
+    for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++) result.NN[k] = 0;
+    
+    /* number of points (used in wTheta(...) for the normalization) */
+    result.N1 = (long *)malloc((para->nsamples+1)*sizeof(long));
+    result.N2 = (long *)malloc((para->nsamples+1)*sizeof(long));
+    result.N1[0] = tree1->N[ROOT];
+    result.N2[0] = tree2->N[ROOT];
+    for(l=0;l<para->nsamples;l++){
+      result.N1[l+1] = tree1->Ntot[l];
+      result.N2[l+1] = tree2->Ntot[l];
+    }   
+  }
+  
+  if(tree1 == tree2 && i > j) return result;
+
+  //TO DO: the test here should be done on the physical distance
+  deltaTheta = para->distAng(tree1, &i, tree2, &j);
+  
+  if(node(tree1, i) && tree1->r[i]/deltaTheta > para->OA){
+    if(node(tree2, j) && tree2->r[j]/deltaTheta > para->OA){
+      Npairs3D(para, tree1, tree1->left[i],  tree2, tree2->left[j],  0); 
+      Npairs3D(para, tree1, tree1->right[i], tree2, tree2->left[j],  0); 
+      Npairs3D(para, tree1, tree1->left[i],  tree2, tree2->right[j], 0); 
+      Npairs3D(para, tree1, tree1->right[i], tree2, tree2->right[j], 0); 
+    }else{
+      Npairs3D(para, tree1, tree1->left[i], tree2,  j,  0);
+      Npairs3D(para, tree1, tree1->right[i], tree2, j,  0);
+    }
+  }else if(node(tree2,j) && tree2->r[j]/deltaTheta > para->OA){
+    Npairs3D(para, tree1, i, tree2, tree2->left[j],   0); 
+    Npairs3D(para, tree1, i, tree2,  tree2->right[j], 0); 
+  }else{
+    //Comme un bourrin...
+    pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
+    rp = tree1->distComo[i]*deltaTheta*PI/180.0;
+    
+    if(para->log){
+      pi = log(pi);
+      rp = log(rp);
+    }
+    k = floor((pi - para->min)/para->Delta);
+    m = floor((rp - para->min)/para->Delta);
+    if(0 <= k && k < para->nbins && 0 <= m && m < para->nbins){
+      NN = tree1->N[i]*tree2->N[j];
+      result.NN[m + para->nbins*k] += NN;
+      for(l=0;l<para->nsamples;l++){
+	result.NN[m + para->nbins*(k + (para->nbins*(l+1)))] += NN*tree1->w[para->nsamples*i + l]*tree2->w[para->nsamples*j + l];
+      }
+    }
+
+    count += tree1->N[i]*tree2->N[j];
+    printCount(count,total,10000,para->verbose);
+  }
+  
+  
+  if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
+  
+  if(firstCall && tree1 == tree2){
+    for(k = 0; k < para->nbins*(para->nsamples+1); k++) result.NN[k] *= 2;
+  }
+  
+  return result;
+}
+
 
 Result gg(const Config *para, const Tree *lens, const long i, const Tree *source, const long j, int firstCall){
   /* Computes the galaxy-galaxy two-point correlation function. */
@@ -779,7 +1046,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
   
   /* dA = phy_dis/angular_size_in_radians = tran_como_dis/(1+z)*/
   dA  = distComo_lens/(1.0 + z_lens);               /* Angular diameter distance in physical coordinates */
-  dR  = deltaTheta*dA*PI/180.0;                     /* Transverse distance in phys coordinates (Mpc)     */
+  dR  = dA*deltaTheta*PI/180.0;                     /* Transverse distance in phys coordinates (Mpc)     */
   dR *= invScaleFac;                                /* If coordinate in comoving system, divide by a     */
   
   if(para->log) dR = log(dR);
@@ -897,7 +1164,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
       result.cosx   =  (double *)malloc(2*result.size*sizeof(double)); 
       result.sinx   =  (double *)malloc(2*result.size*sizeof(double)); 
     }
-    if(para->corr == GGLENS){
+    if(para->corr == GGLENS || para->corr == AUTO_WP){
       result.distComo = (double *)malloc(result.size*sizeof(double));
     }
     
@@ -919,7 +1186,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
       n += (mask->min[NDIM*j + i] < result.point.x[NDIM*local_index + i] && 
 	    result.point.x[NDIM*local_index + i] < mask->max[NDIM*j + i] );
     }
-    if(n == NDIM){  /* "resul.point" is in the subsample "j" */
+    if(n == NDIM){  /* "result.point" is in the subsample "j" */
       for(i=0;i<para->nsamples;i++){  /* loop over resamplings  */
 	result.w[para->nsamples*local_index + i] = mask->w[para->nsamples*i+j];
       }
@@ -934,7 +1201,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     result.sinx[2*local_index+0] = sin(result.point.x[NDIM*local_index+0]*PI/180.0);
     result.sinx[2*local_index+1] = sin(result.point.x[NDIM*local_index+1]*PI/180.0);   
   }
-  if(para->corr == GGLENS){
+  if(para->corr == GGLENS || para->corr == AUTO_WP){
     result.distComo[local_index] = distComo(result.point.x[NDIM*local_index+2], para->a);
   }
   
@@ -955,11 +1222,12 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
       dMax     = d;
     }
   }
+  
   if(para->coordType == RADEC){
     result.r[local_index] = distAngPointSpher(para, &(result.point), &local_index, data, &maxPoint);
   }else{
     result.r[local_index] = d;
-  }
+  } 
   
   if(data->N > NLEAF){   /* node ----------------------------- */
     
@@ -1128,6 +1396,14 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
 
 void freeTree(const Config para, Tree tree){
   /* Frees the tree "tree". */
+
+  if(para.coordType == RADEC){
+    free(tree.cosx);
+    free(tree.sinx);
+  }
+  if(para.corr == GGLENS || para.corr == AUTO_WP){
+    free(tree.distComo);
+  }
   
   free(tree.left);
   free(tree.right);
@@ -1218,7 +1494,7 @@ double distAngSpher(const Tree *a, const long *i, const Tree *b, const long *j){
   /*Returns the angular distance between nodes 
    * a[i] and b[i]. Spherical coordinates.
    */
-
+  
   double sin2_ra  = 0.5*(1.0 - a->cosx[2*(*i)+0]*b->cosx[2*(*j)+0] - a->sinx[2*(*i)+0]*b->sinx[2*(*j)+0]);
   double sin2_dec = 0.5*(1.0 - a->cosx[2*(*i)+1]*b->cosx[2*(*j)+1] - a->sinx[2*(*i)+1]*b->sinx[2*(*j)+1]);
   
@@ -1388,6 +1664,11 @@ void comResult(const Config para, Result result, long Ncpu, int split){
       MPI_Send(result.meanR,    para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
       MPI_Send(result.e2,       para.nbins, MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
       break;
+    case AUTO_WP:
+      MPI_Send(result.NN, para.nbins*para.nbins*(para.nsamples+1), MPI_LONG, MASTER, BASE+0, MPI_COMM_WORLD);
+      MPI_Send(result.N1, para.nsamples+1, MPI_LONG, MASTER, BASE+1, MPI_COMM_WORLD);
+      MPI_Send(result.N2, para.nsamples+1, MPI_LONG, MASTER, BASE+2, MPI_COMM_WORLD);
+      break;
     }
   }else{
     
@@ -1433,8 +1714,23 @@ void comResult(const Config para, Result result, long Ncpu, int split){
 	  }
 	}
 	break;
-      freeResult(para, slave);
-    }
+      case AUTO_WP:
+	slave.NN = (long *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(long));
+	slave.N1 = (long *)malloc((para.nsamples+1)*sizeof(long)); 
+	slave.N2 = (long *)malloc((para.nsamples+1)*sizeof(long)); 
+	for(rank=1;rank<Ncpu;rank++){
+	  MPI_Recv(slave.NN, para.nbins*para.nbins*(para.nsamples+1), MPI_LONG, rank, BASE+0, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.N1, para.nsamples+1, MPI_LONG, rank, BASE+1, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.N2, para.nsamples+1, MPI_LONG, rank, BASE+2, MPI_COMM_WORLD, &status);
+	  for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
+	  if(split){
+	    /* only N2 may be partitioned */
+	    for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
+	  }
+	}	
+	break;
+	freeResult(para, slave);
+      }
   }
 }
 #undef BASE
@@ -1514,7 +1810,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.12\n\n	\
+                (Super W Of Theta) MPI version 0.13\n\n	\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -1537,12 +1833,12 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
       printf("rancols1       %d,%d\t  #Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
       printf("ran2           %s\t  #input random catalogue #2\n",para->fileRanName2);
       printf("rancols2       %d,%d\t  #Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
-      printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D,RADEC_Z]\n");
-      printf("                    \t  #(in degrees if RADEC)\n");
+      printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
+      printf("                    \t  #in degrees if RADEC\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Correlation options                                       #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("corr           auto\t #Type of correlation: [auto,cross,gglens]\n");
+      printf("corr           auto\t #Type of correlation: [auto,cross,gglens,auto_wp]\n");
       printf("est            ls\t #Estimator [ls,nat,ham]\n");
       printf("range          %g,%g\t #Correlation range. Unity same as \"coord\":\n",para->min,para->max);
       printf("                    \t #in degrees for RADEC, in Mpc otherwise)\n");
@@ -1600,21 +1896,18 @@ in the input catalogues must be in decimal degrees.\n",MYNAME,MYNAME);
   
   /* ----------------------------------------------------------------------
    *STEP 4: readjust parameters if needed */
-  if(para->corr == GGLENS){
+  if(para->corr == GGLENS || para->corr == AUTO_WP){
     NDIM  = 3;
     if(para->proj == THETA){
-      para->proj = COMO; /*Default projection for gg lensing*/
+      para->proj = COMO; /*Default projection for gg lensing and wp*/
     }
   }
+  
   
   /* set the angular distance measurement method */
   switch(para->coordType)
     {
     case RADEC:
-      para->distAng = &distAngSpher;
-      break;
-    case RADEC_Z:
-      NDIM = 3;
       para->distAng = &distAngSpher;
       break;
     case CART:
@@ -1685,15 +1978,15 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"coord")) {
     checkArg(field,arg,para);
     if(!strcmp(arg,"RADEC"))        para->coordType = RADEC;
-    else if(!strcmp(arg,"RADEC_Z"))    para->coordType = RADEC_Z;
     else if(!strcmp(arg,"CART"))    para->coordType = CART;
     else if(!strcmp(arg,"CART3D"))  para->coordType = CART3D;
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"corr")) {
     checkArg(field, arg, para);
-    if(!strcmp(arg,"cross"))       para->corr = CROSS;
-    else if(!strcmp(arg,"auto"))   para->corr = AUTO;
-    else if(!strcmp(arg,"gglens")) para->corr = GGLENS;
+    if(!strcmp(arg,"cross"))        para->corr = CROSS;
+    else if(!strcmp(arg,"auto"))    para->corr = AUTO;
+    else if(!strcmp(arg,"gglens"))  para->corr = GGLENS;
+    else if(!strcmp(arg,"auto_wp")) para->corr = AUTO_WP;
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"proj")) {
     checkArg(field,arg,para);
@@ -2097,7 +2390,6 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX]){
   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL)
     if(*(line) != '#' && *(line) != '\0' && *(line) != '\n') N++;
   rewind(fileIn);
-  
   
   if(N < para.size){
     /* if no point found in fileIn or if the number of 
