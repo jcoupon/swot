@@ -30,4 +30,3 @@ proj           como	 #Axis projection (or phys)
 #----------------------------------------------------------#
 out            corr.out	 #Output file: coord corr(coord) corr_err
 cov            no	 #Covariance matrix of errors (yes or no)
-cov_out        cov.out	 #Covariance output file

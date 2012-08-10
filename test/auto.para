@@ -29,11 +29,9 @@ proj           theta	 #Axis projection (or phys)
 H0             72	 #Hubble parameter
 Omega_M        0.258	 #Relative matter density
 Omega_L        0.742	 #Relative energy density (Lambda)
-sigz           0.03	 #Redshift accuracy
 #proj           como	 #Axis projection (or phys)
 #----------------------------------------------------------#
 #Output options                                            #
 #----------------------------------------------------------#
 out            corr.out	 #Output file: coord corr(coord) corr_err
 cov            yes	 #Covariance matrix of errors (yes or no)
-cov_out        cov.out	 #Covariance output file

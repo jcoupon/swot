@@ -14,7 +14,6 @@
 #include "mpi.h"
 #include <gsl/gsl_integration.h>
 
-
 /* useful constants */
 #define PI    3.14159265358979323846
 #define TWOPI 6.283185307179586476925287
@@ -45,10 +44,13 @@
 #define COMO        0
 #define THETA       1
 #define PHYS        2
-#define CROSS       0
-#define AUTO        1
-#define GGLENS      2
-#define AUTO_WP     3
+
+#define AUTO        0
+#define CROSS       1
+#define AUTO_WP     2
+#define CROSS_WP    3
+#define GGLENS      4
+
 #define LS          0
 #define NAT         1
 #define HAM         2
@@ -165,8 +167,8 @@ typedef struct Config
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
-    corr, coordType, log, Ninfo, proj;
-  double deltaz, min, max, Delta, OA;        
+    corr, coordType, log, Ninfo, proj, xi;
+  double deltaz, min, max, Delta, OA, pi_max; 
   
   /* error method JACKKNIFE or BOOTSTRAP */
   int err, nsamples;
@@ -180,7 +182,7 @@ typedef struct Config
   /* input and output files information */
   char fileInName1[1000],  fileInName2[1000]; 
   char fileRanName1[1000], fileRanName2[1000];
-  char fileOutName[1000],  fileCovOutName[1000];
+  char fileOutName[1000];
   
   /* column ids for input files */
   int data1Id[NIDSMAX], data2Id[NIDSMAX];
@@ -198,7 +200,6 @@ typedef struct Config
 void autoCorr(Config para);
 void crossCorr(Config para);
 void ggCorr(Config para);
-void autoCorr_wp(Config para);
 
 double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l);
 double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l);
