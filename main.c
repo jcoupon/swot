@@ -37,7 +37,11 @@
  *Known bugs:
  * - when resampling, some objects fall outside the excluded zone
  *
- *Versions:
+ *Version history
+ * 
+ *v 0.15 Aug 21st [Alexie/Jean]
+ * - bug corrected for sig crit in phys coordinates 
+ *   (1+z_lens) factor was missing 
  *
  *v 0.14 Aug 10th [Jean]
  * - implemented wp(rp): set -corr auto_wp 
@@ -72,6 +76,7 @@ int main(argc,argv)
      char **argv;
 {
 
+
   int rank = 0, size = 1;
   /* MPI initialization:
    * "rank" is the id of the current cpu in use [0: master, size-1: last cpu]
@@ -89,7 +94,7 @@ int main(argc,argv)
   para.size = size;
   para.rank = rank;
   initPara(argc,argv,&para);
-  
+
   /* computation time begins */
   double t0 = MPI_Wtime();
   
@@ -1159,6 +1164,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
     exit(EXIT_FAILURE);
     break;
   }
+
   
   /* dA = phy_dis/angular_size_in_radians = tran_como_dis/(1+z)*/
   dA  = distComo_lens/(1.0 + z_lens);               /* Angular diameter distance in physical coordinates */
@@ -1168,7 +1174,6 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
   if(para->log) dR = log(dR);
   k = floor((dR - para->min)/para->Delta);
   if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens + para->deltaz){
-  //DEBUGGING if(0 <= k && k < para->nbins && z_source > z_lens + 0.1){
     /* Point A --------------------------------- */
     Point A = createPoint(*para, 1);
     A.x[0]    = RA_source;
@@ -1183,12 +1188,12 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
     double sin2phi_gg = sin(2.0*phi_gg);
     double e1         =  e1_source*cos2phi_gg + e2_source*sin2phi_gg;
     double e2         = -e1_source*sin2phi_gg + e2_source*cos2phi_gg;
-    double DOS        = distComo_source;                 /* Note this is a comoving los distance,         */
-    double DOL        = distComo_lens;                   /* but redshift factors cancel out               */
-    double DLS        = distComo_source - distComo_lens; /* Approx. Omega_k = 0                           */
-    double SigCritInv = DOL*DLS/DOS/1000.0/invScaleFac;  /* 1/SigCrit in Gpc                              */
-    SigCritInv       /= 1.663e3;                         /* see Narayan & Bartelman pge 10                */
-    SigCritInv       *= invScaleFac*invScaleFac;         /* If coordinates in comoving system             */
+    double DOS        = distComo_source;                  /*  this is angular diameter distance       */
+    double DOL        = distComo_lens;                    /*  but (1+z_source) factors cancel out     */
+    double DLS        = distComo_source - distComo_lens;  /* Approx. Omega_k = 0                      */
+    double SigCritInv = DOL*DLS/DOS/1000.0/(1.0 + z_lens);/* 1/SigCrit in Gpc                         */
+    SigCritInv       /= 1.663e3;                          /* see Narayan & Bartelman pge 10           */
+    SigCritInv       *= invScaleFac*invScaleFac;          /* If coordinates in comoving system        */
     
     /* ATTENTION: source->w and lens->w are resampling weights (boostrap or jackknife) whereas
      * w below (and further result.w) is the lensing weight (i.e. shape measurement error 
@@ -1945,7 +1950,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.14\n\n	\
+                (Super W Of Theta) MPI version 0.15\n\n	\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
