@@ -19,7 +19,8 @@
  * - update README file
  * - make a default file for each type of correlation
  * - approximation at large scale for 3D and wp based on physical distance
- * - add weight for w(theta)
+ * - add weight and mean theta for w(theta)
+ * - implement w(R)
  * - compute tangential shear
  * - option to take into account the East-West orientation
  * - measure the tangential shear
@@ -34,7 +35,7 @@
  *   Alexie Leauthaud's code 
  *   (see Leauthaud et al. 2010ApJ...709...97L).
  *
- *Known bugs:
+ * Known bugs:
  * - when resampling, some objects fall outside the excluded zone
  *
  *Version history
@@ -758,7 +759,7 @@ void ggCorr(Config para){
       /* R and Rmean (weighted) */
       if(para.log){ 
 	R     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
-       	meanR = exp(result.meanR[i]/result.w[i]);
+	meanR = exp(result.meanR[i]/result.w[i]);
       }else{
 	R     = para.min+para.Delta*(double)i+para.Delta/2.0;
 	meanR = result.meanR[i]/result.w[i];
@@ -1210,7 +1211,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
       result.w[para->nbins*(l+1) + k]  += w*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
     }    
     /* keep track of info per bin */
-    result.Nsources[k] += 1.0; 
+    result.Nsources[k] += 1.0;
     result.meanR[k]    += dR*w;
     result.e2[k]       += e2*w/SigCritInv;
     freePoint(*para, A);
