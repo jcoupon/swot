@@ -14,13 +14,9 @@
  * TO DO:
  * - make consistent indices for rp and xi
  * - read m and compute 1 + K for the "m" gg correction
- * - remove coord option (CART), or try to make more simple: corr: 
- * auto_wtheta, cross_wtheta, auto_wp, cross_wp, auto_3D, cross_3D, gglens
  * - update README file
- * - make a default file for each type of correlation
  * - approximation at large scale for 3D and wp based on physical distance
- * - add weight and mean theta for w(theta)
- * - implement w(R)
+ * - add weight and for w(theta)
  * - compute tangential shear
  * - option to take into account the East-West orientation
  * - measure the tangential shear
@@ -38,13 +34,23 @@
  * Known bugs:
  * - when resampling, some objects fall outside the excluded zone
  *
- *Version history
+ * Version history
  * 
- *v 0.15 Aug 21st [Alexie/Jean]
+ * v 0.2 Oct 21st [Jean]
+ * - w(R) implemented: -proj phys/como
+ * - wp(rp) can be computed as function 
+ *   of physical coordinates -proj phys
+ * - "coord" option deleted. It is assumed that 
+ *   auto_wtheta, cross_wtheta, auto_wp, cross_wp, and gglens
+ *   all have RA DEC z as input
+ *   auto_3D and cross_3D to be implemented soon
+ * - implemented w(theta) and wp(rp) weights
+ *
+ * v 0.15 Aug 21st [Alexie/Jean]
  * - bug corrected for sig crit in phys coordinates 
  *   (1+z_lens) factor was missing 
  *
- *v 0.14 Aug 10th [Jean]
+ * v 0.14 Aug 10th [Jean]
  * - implemented wp(rp): set -corr auto_wp 
  *   and cross_wp for computing wp(rp)
  * - added -xi yes option to print out xi(rp,pi)
@@ -56,27 +62,26 @@
  *   recent versions of Mac OS Xcode and icc 11.1
  *   if using icc, it must be compiled with -use-asm
  *   see http://stackoverflow.com/questions/11877044
- *v 0.12 May 1st [Jean]
+ * v 0.12 May 1st [Jean]
  * - xi(r) 3D added (option -coord CART3D)
  * - default parameter file (swot -d) improved
  *
- *v 0.11 April 4th [Jean]
+ * v 0.11 April 4th [Jean]
  * - data2 for sources catalogue
  * - more details in swot -d, -o now works
  * - no approx.: -OA no
  *
- *v 0.1 April 3rd [Jean]
- *- version from the old - memory monster - one.
- *  For previous versions, see main.c in legacy/
- *  option "nboots" has been replaced by "nsamples"
- *  and must be a power of two
+ * v 0.1 April 3rd [Jean]
+ * - version from the old - memory monster - one.
+ *   For previous versions, see main.c in legacy/
+ *   option "nboots" has been replaced by "nsamples"
+ *   and must be a power of two
  *-------------------------------------------------------------------------*/
 
 int main(argc,argv)
      int argc;
      char **argv;
 {
-
 
   int rank = 0, size = 1;
   /* MPI initialization:
@@ -135,7 +140,8 @@ void autoCorr(Config para){
    */
   
   int dimStart = 0;
-  long i, j, k, l, n, DD_sum, DR_sum, RR_sum;
+  long i, j, k, l, n;
+  double DD_sum, DR_sum, RR_sum;
   Point data, random;
   Tree dataTree, randomTree;
   Result DD, DR, RR;
@@ -145,10 +151,10 @@ void autoCorr(Config para){
   
   /* read files */
   if(para.rank == MASTER){
-    comment(para,"Reading fileRan1..."); random = readCat(para, para.fileRanName1, para.ran1Id);
+    comment(para,"Reading fileRan1..."); random = readCat(para, para.fileRanName1, para.ran1Id, 0);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random.N);}
     
-    comment(para,"Reading fileIn1....");  data  = readCat(para, para.fileInName1, para.data1Id);
+    comment(para,"Reading fileIn1....");  data  = readCat(para, para.fileInName1, para.data1Id, para.weighted);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data.N);}
   }  
   
@@ -172,7 +178,7 @@ void autoCorr(Config para){
   long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
   long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
 
-  /*
+  /* DEBUGGING
   if(para.verbose){
     para.rank = 0;
     nodeSlaveData  = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
@@ -208,12 +214,20 @@ void autoCorr(Config para){
   if(para.rank == MASTER){
     
     /* R */
-    double *R = (double *)malloc(para.nbins*sizeof(double));
+    double *R          = (double *)malloc(para.nbins*sizeof(double));
+    double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
     for(i=0;i<para.nbins;i++){
+      if(para.corr == AUTO) sum = DD.NN[i];
+      if(para.corr == AUTO_WP) {
+	sum = 0.0;
+	for(j=0;j<para.nbins;j++) sum += DD.NN[i + para.nbins*j];
+      }
       if(para.log){
-	R[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	R[i]     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	meanR[i] = exp(DD.meanR[i]/sum);
       }else{
-	R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
+	R[i]     = para.min+para.Delta*(double)i+para.Delta/2.0;
+	meanR[i] = DD.meanR[i]/sum;
       }
     }
     
@@ -294,33 +308,39 @@ void autoCorr(Config para){
     case BOOTSTRAP: fprintf(fileOut, "#Resampling: bootstrap (%d samples)\n", para.nsamples); break;
     }
     switch(para.corr){
-    case AUTO:   
-      fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)        DD               DR            RR         Ndata      Nrandom\n");
+    case AUTO:
+      if(para.proj == COMO){
+	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)        <R>              DD               DR            RR         Ndata      Nrandom\n");
+      }else if(para.proj == PHYS){
+	fprintf(fileOut, "#  R(physical)  w            err(total) err(resampling) err(poisson)        <R>              DD               DR            RR         Ndata      Nrandom\n");
+      }else{
+	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)        <R>              DD               DR            RR         Ndata      Nrandom\n");
+      }
       for(i=0;i<para.nbins;i++){
-	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %15zd %15zd %15zd %10zd %10zd\n", 
+	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i],
+		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
       }
       break;
     case AUTO_WP: 
       fprintf(fileOut, "#Attention: sum(...) are the integrated sums of pairs along pi,\n");
       fprintf(fileOut, "#given for reference ONLY. No combination of these would lead to wp.\n");
-      fprintf(fileOut, "#  rp         wp           err(total) err(resampling) err(poisson) 	    sum(DD)          sum(DR)       sum(RR)    Ndata      Nrandom\n");
+      fprintf(fileOut, "#  rp         wp           err(total) err(resampling) err(poisson) 	    <R>              sum(DD)          sum(DR)       sum(RR)    Ndata      Nrandom\n");
       for(i=0;i<para.nbins;i++){
 	RR_sum = 0;
 	DR_sum = 0;
 	DD_sum = 0;
 	j      = 0;
-	while(R[j] < para.pi_max && j < para.nbins){  /* sum over pi integration */
+	while(R[j] < para.pi_max && j < para.nbins){  /* sum over pi integration - ONLY informative */
 	  RR_sum += RR.NN[i + para.nbins*j];
 	  DR_sum += DR.NN[i + para.nbins*j];
 	  DD_sum += DD.NN[i + para.nbins*j];
 	  j++;
 	}
-	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %15zd %15zd %15zd %10zd %10zd\n", 
+	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0), 
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i],
+		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		DD_sum, DR_sum, RR_sum,  DD.N1[0],  RR.N1[0]);
       }
       break;
@@ -376,6 +396,7 @@ void autoCorr(Config para){
     }
     
     free(R);
+    free(meanR);
     free(wmean);
     free(err_r);
     free(err_p);
@@ -395,7 +416,8 @@ void crossCorr(Config para){
    */
   
   int swapped = 0, dimStart = 0;
-  long i, j, k, l, n, D1D2_sum, D1R1_sum, D2R2_sum, R1R2_sum;
+  long i, j, k, l, n;
+  double  D1D2_sum, D1R1_sum, D2R2_sum, R1R2_sum;
   Point data1, data2, random1, random2, tmp;
   Tree dataTree1, dataTree2, randomTree1, randomTree2;
   Result D1D2, D1R1, D2R2, R1R2;
@@ -405,16 +427,16 @@ void crossCorr(Config para){
   
   /* read files */
   if(para.rank == MASTER){
-    comment(para,"Reading fileRan1..."); random1 = readCat(para, para.fileRanName1, para.ran1Id);
+    comment(para,"Reading fileRan1..."); random1 = readCat(para, para.fileRanName1, para.ran1Id, 0);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random1.N);}
     
-    comment(para,"Reading fileRan2..."); random2 = readCat(para, para.fileRanName2, para.ran2Id);
+    comment(para,"Reading fileRan2..."); random2 = readCat(para, para.fileRanName2, para.ran2Id, 0);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random2.N);}
     
-    comment(para,"Reading fileIn1..."); data1 = readCat(para, para.fileInName1, para.data1Id);
+    comment(para,"Reading fileIn1..."); data1 = readCat(para, para.fileInName1, para.data1Id, para.weighted);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data1.N);}
     
-    comment(para,"Reading fileIn2..."); data2 = readCat(para, para.fileInName2, para.data2Id);
+    comment(para,"Reading fileIn2..."); data2 = readCat(para, para.fileInName2, para.data2Id, para.weighted);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data2.N);}
     
     /* swap "1" and "2" if "1" is larger (to improve memory management)  */
@@ -480,14 +502,22 @@ void crossCorr(Config para){
   
   /* print out results */
   if(para.rank == MASTER){
-
-    /* R */
-    double *R = (double *)malloc(para.nbins*sizeof(double));
+   
+     /* R */
+    double *R          = (double *)malloc(para.nbins*sizeof(double));
+    double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
     for(i=0;i<para.nbins;i++){
+      if(para.corr == AUTO) sum = (double)D1D2.NN[i];
+      if(para.corr == AUTO_WP) {
+	sum = 0.0;
+	for(j=0;j<para.nbins;j++) sum += D1D2.NN[i + para.nbins*j];
+      }
       if(para.log){
-	R[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	R[i]     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	meanR[i] = exp(D1D2.meanR[i]/sum);
       }else{
-	R[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
+	R[i]     = para.min+para.Delta*(double)i+para.Delta/2.0;
+	meanR[i] = D1D2.meanR[i]/sum;
       }
     }
     
@@ -570,18 +600,30 @@ void crossCorr(Config para){
     }
     switch(para.corr){
     case CROSS:   
-      fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)               D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      if(para.proj == COMO){
+	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      }else if(para.proj == PHYS){
+	fprintf(fileOut, "#  R(physical)  w            err(total) err(resampling) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      }else{
+	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)               <theta>          D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      }
+     
       for(i=0;i<para.nbins;i++){
-	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %15zd %15zd  %15zd %15zd %10zd %10zd %10zd %10zd\n", 
+	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, 0),
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i],
+		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		D1D2.NN[i], D1R1.NN[i], D2R2.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
       }
       break;
     case CROSS_WP:
       fprintf(fileOut, "#Attention: sum(...) are the integrated sums of pairs along pi,\n");
       fprintf(fileOut, "#given for reference ONLY. No combination of these would lead to wp.\n");
-      fprintf(fileOut, "#  rp           wp           err(total) err(resampling) err(poisson)               sum(D1D2)        sum(D1R1)       sum(D2R2)     sum(R1R2)  Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      if(para.proj == COMO){
+	fprintf(fileOut, "#  rp(comoving) wp           err(total) err(resampling) err(poisson)               <rp>             sum(D1D2)        sum(D1R1)       sum(D2R2)     sum(R1R2)  Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      }else if(para.proj == PHYS){
+	fprintf(fileOut, "#  rp(physical) wp           err(total) err(resampling) err(poisson)               <rp>             sum(D1D2)        sum(D1R1)       sum(D2R2)     sum(R1R2)  Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+      }
+     
       for(i=0;i<para.nbins;i++){
 	R1R2_sum = 0;
 	D1R1_sum = 0;
@@ -595,9 +637,9 @@ void crossCorr(Config para){
 	  D1D2_sum += D1D2.NN[i + para.nbins*j];
 	  j++;
 	}
-	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %15zd %15zd  %15zd %15zd %10zd %10zd %10zd %10zd\n", 
+	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wp(para, para.estimator, D1D2, R1R2, D1R1, D2R2, -1, i, 0),
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i],
+		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		D1D2_sum, D1R1_sum, D2R2_sum, R1R2_sum,  D1D2_sum,  R1R2_sum,  D1D2.N2[0],  R1R2.N2[0]);
       }
       break;
@@ -683,10 +725,10 @@ void ggCorr(Config para){
   
   /* read files */
   if(para.rank == MASTER){
-    comment(para,"Reading sources file..."); source = readCat(para, para.fileInName2, para.data2Id);
+    comment(para,"Reading sources file..."); source = readCat(para, para.fileInName2, para.data2Id, 0);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd sources found).\n", source.N);}
     
-    comment(para,"Reading lenses file...."); lens   = readCat(para, para.fileInName1, para.data1Id);
+    comment(para,"Reading lenses file...."); lens   = readCat(para, para.fileInName1, para.data1Id, 0);
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd lenses found).\n", lens.N);}
   }  
   
@@ -815,10 +857,10 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
   /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
   
   /* initialization */
-  double Norm1 = (double)(R1R2.N1[l]*(R1R2.N2[l]-1))/(double)(D1D2.N1[l]*(D1D2.N2[l]-1));
-  double Norm2 = (double)(R1R2.N2[l]-1)/(double)D1D2.N1[l];
-  double Norm3 = (double)(R1R2.N1[l]-1)/(double)D1D2.N2[l];
-  double Norm4 = (double)(D1D2.N2[l]*R1R2.N2[l])/(double)((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+  double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
+  double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
+  double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+  double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
   
   double result = 0.0;
   
@@ -828,15 +870,15 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
      && R1R2.NN[para.nbins*l+i] > 0){
     switch(estimator){
     case LS:  /* Landy and Szalay */ 
-      result  =  Norm1*(double)D1D2.NN[para.nbins*l+i]/(double)R1R2.NN[para.nbins*l+i];
-      result += -Norm2*(double)D1R1.NN[para.nbins*l+i]/(double)R1R2.NN[para.nbins*l+i];
-      result += -Norm3*(double)D2R2.NN[para.nbins*l+i]/(double)R1R2.NN[para.nbins*l+i] + 1.0;
+      result  =  Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
+      result += -Norm2*D1R1.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
+      result += -Norm3*D2R2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] + 1.0;
       break;
     case NAT: /* Natural */
-      result = Norm1*(double)D1D2.NN[para.nbins*l+i]/(double)R1R2.NN[para.nbins*l+i] - 1.0;
+      result = Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] - 1.0;
       break;
     case HAM: /* Hamilton */
-      result = Norm4*(double)D1D2.NN[para.nbins*l+i]*(double)R1R2.NN[para.nbins*l+i]/((double)D1R1.NN[para.nbins*l+i]*(double)D2R2.NN[para.nbins*l+i]) - 1.0;
+      result = Norm4*D1D2.NN[para.nbins*l+i]*R1R2.NN[para.nbins*l+i]/(D1R1.NN[para.nbins*l+i]*D2R2.NN[para.nbins*l+i]) - 1.0;
       break;
     }
   }
@@ -851,10 +893,10 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
   double R;
   
   /* initialization */
-  double Norm1 = (double)(R1R2.N1[l]*(R1R2.N2[l]-1))/(double)(D1D2.N1[l]*(D1D2.N2[l]-1));
-  double Norm2 = (double)(R1R2.N2[l]-1)/(double)D1D2.N1[l];
-  double Norm3 = (double)(R1R2.N1[l]-1)/(double)D1D2.N2[l];
-  double Norm4 = (double)(D1D2.N2[l]*R1R2.N2[l])/(double)((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+  double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
+  double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
+  double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+  double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
   
   double result = 0.0, sum = 0.0;
   
@@ -865,15 +907,15 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
 	&& R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
       switch(estimator){
       case LS:  /* Landy and Szalay */
-	result  =  Norm1*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)];
-	result += -Norm2*(double)D1R1.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)];
-	result += -Norm3*(double)D2R2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)] + 1.0;
+	result  =  Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
+	result += -Norm2*D1R1.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
+	result += -Norm3*D2R2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)] + 1.0;
 	break;
       case NAT: /* Natural */
-	result = Norm1*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
+	result = Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
 	break;
       case HAM: /* Hamilton */
-	result = Norm4*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]*(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)]/((double)D1R1.NN[j + para.nbins*(i + para.nbins*l)]*(double)D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
+	result = Norm4*D1D2.NN[j + para.nbins*(i + para.nbins*l)]*R1R2.NN[j + para.nbins*(i + para.nbins*l)]/(D1R1.NN[j + para.nbins*(i + para.nbins*l)]*D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
 	break;
       }
     }
@@ -891,23 +933,23 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
 	  && R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
 	switch(estimator){
 	case LS:  /* Landy and Szalay */
-	  sum  =  Norm1*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)];
-	  sum += -Norm2*(double)D1R1.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)];
-	  sum += -Norm3*(double)D2R2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)] + 1.0;
+	  sum  =  Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
+	  sum += -Norm2*D1R1.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
+	  sum += -Norm3*D2R2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)] + 1.0;
 	  break;
 	case NAT: /* Natural */
-	  sum = Norm1*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]/(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
+	  sum = Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
 	  break;
 	case HAM: /* Hamilton */
-	  sum = Norm4*(double)D1D2.NN[j + para.nbins*(i + para.nbins*l)]*(double)R1R2.NN[j + para.nbins*(i + para.nbins*l)]/((double)D1R1.NN[j + para.nbins*(i + para.nbins*l)]*(double)D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
+	  sum = Norm4*D1D2.NN[j + para.nbins*(i + para.nbins*l)]*R1R2.NN[j + para.nbins*(i + para.nbins*l)]/(D1R1.NN[j + para.nbins*(i + para.nbins*l)]*D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
 	  break;
 	}
       }
       if(para.log){
-	R       = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	R       = exp(para.min+para.Delta*i+para.Delta/2.0);
 	result += 2.0*sum*R*para.Delta;
       }else{
-	R       = para.min+para.Delta*(double)i+para.Delta/2.0;
+	R       = para.min+para.Delta*i+para.Delta/2.0;
 	result += 2.0*sum*para.Delta;
       }
       i++;
@@ -919,26 +961,37 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
 #define leaf(tree,node) ((tree)->left[(node)] == -1)
 #define node(tree,node) ((tree)->left[(node)] > -1)
 
+#define z_tree1         ((tree1)->point.x[NDIM*(i)+2])
+#define distComo_tree1  ((tree1)->distComo[(i)])
+
 Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall){ 
   /* returns the number of pairs if tree1 != tree2, and twice 
    * the number of pairs if tree1 == tree2, so that the treatment of pairs 
    * in w(theta) estimators is identical (numerical trick).
    */
   
-  long NN, k = 0, l;
+  long k = 0, l;
   static Result result;
   static long count, total;
-  double deltaTheta;
+  double NN, d, deltaTheta;
   
   if(firstCall){
     count = 0;
     total = tree1->N[i]*tree2->N[j];
-    result.NN = (long *)malloc(para->nbins*(para->nsamples+1)*sizeof(long));
-    for(k = 0; k < para->nbins*(para->nsamples+1); k++) result.NN[k] = 0;
+    result.NN = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
+    result.w  = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
+    for(k = 0; k < para->nbins*(para->nsamples+1); k++){
+      result.NN[k] = 0;
+      result.w[k]  = 0.0;
+    }
+    result.meanR    = (double *)malloc(para->nbins*sizeof(double));
+    for(k = 0; k < para->nbins; k++){
+      result.meanR[k]    = 0.0;
+    }
     
     /* number of points (used in wTheta(...) for the normalization) */
-    result.N1 = (long *)malloc((para->nsamples+1)*sizeof(long));
-    result.N2 = (long *)malloc((para->nsamples+1)*sizeof(long));
+    result.N1 = (double *)malloc((para->nsamples+1)*sizeof(double));
+    result.N2 = (double *)malloc((para->nsamples+1)*sizeof(double));
     result.N1[0] = tree1->N[ROOT];
     result.N2[0] = tree2->N[ROOT];
     for(l=0;l<para->nsamples;l++){
@@ -950,7 +1003,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
   if(tree1 == tree2 && i > j) return result;
   
   deltaTheta = para->distAng(tree1, &i, tree2, &j);
-  
+    
   if(node(tree1, i) && tree1->r[i]/deltaTheta > para->OA){
     if(node(tree2, j) && tree2->r[j]/deltaTheta > para->OA){
       Npairs(para, tree1, tree1->left[i],  tree2, tree2->left[j],  0); 
@@ -965,28 +1018,49 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
     Npairs(para, tree1, i, tree2, tree2->left[j],   0); 
     Npairs(para, tree1, i, tree2,  tree2->right[j], 0); 
   }else{
-    if(para->log) deltaTheta = log(deltaTheta);
-    k = floor((deltaTheta - para->min)/para->Delta);
+    
+    switch(para->proj){
+    case COMO:
+      d  = distComo_tree1*deltaTheta*PI/180.0;              /* Transverse distance in comoving coordinates (Mpc) */
+      break;
+    case PHYS:
+      d  = distComo_tree1*deltaTheta*PI/180.0/(1+z_tree1);  /* Transverse distance in physical coordinates (Mpc) */
+      break;
+    case THETA:
+      d = deltaTheta;
+      break;
+    }
+    
+    /* Note: tree->N[i] is the weighted sum of objects so there's no 
+     * need to keep track of the sum of the weights, which is simply NN. 
+     */
+    if(para->log) d = log(d);
+    k = floor((d - para->min)/para->Delta);
     if(0 <= k && k < para->nbins){
       NN = tree1->N[i]*tree2->N[j];
       result.NN[k] += NN;
       for(l=0;l<para->nsamples;l++){
 	result.NN[para->nbins*(l+1) + k] += NN*tree1->w[para->nsamples*i + l]*tree2->w[para->nsamples*j + l];
       }
+      result.meanR[k] += d*NN;
     }
     count += tree1->N[i]*tree2->N[j];
     printCount(count,total,10000,para->verbose);
   }
-    
-  if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
+  
+  if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n", 100.0); 
   
   if(firstCall && tree1 == tree2){
-    for(k = 0; k < para->nbins*(para->nsamples+1); k++) result.NN[k] *= 2;
+    for(k = 0; k < para->nbins*(para->nsamples+1); k++){
+      result.NN[k] *= 2;
+    }
+    for(k = 0; k < para->nbins; k++){
+      result.meanR[k] *= 2.0;
+    }
   }
   
   return result;
 }
-
 
 Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall){ 
   /* returns the number of pairs if tree1 != tree2, and twice 
@@ -994,20 +1068,23 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
    * in w(theta) estimators is identical (numerical trick).
    */
   
-  long NN, k = 0, m = 0, l;
+  long k = 0, m = 0, l;
   static Result result;
   static long count, total;
-  double deltaTheta, rp, pi, d;
+  double NN, deltaTheta, rp, pi, d;
   
   if(firstCall){
     count = 0;
     total = tree1->N[i]*tree2->N[j];
-    result.NN = (long *)malloc(para->nbins*para->nbins*(para->nsamples+1)*sizeof(long));
+    result.NN = (double *)malloc(para->nbins*para->nbins*(para->nsamples+1)*sizeof(double));
     for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++) result.NN[k] = 0;
-    
+    result.meanR = (double *)malloc(para->nbins*sizeof(double));
+    for(k = 0; k < para->nbins; k++){
+      result.meanR[k]    = 0.0;
+    }
     /* number of points (used in wTheta(...) for the normalization) */
-    result.N1 = (long *)malloc((para->nsamples+1)*sizeof(long));
-    result.N2 = (long *)malloc((para->nsamples+1)*sizeof(long));
+    result.N1 = (double *)malloc((para->nsamples+1)*sizeof(double));
+    result.N2 = (double *)malloc((para->nsamples+1)*sizeof(double));
     result.N1[0] = tree1->N[ROOT];
     result.N2[0] = tree2->N[ROOT];
     for(l=0;l<para->nsamples;l++){
@@ -1024,7 +1101,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
   
   /* DEBUGGING */
   d          = deltaTheta;
-
+  
   if(node(tree1, i) && tree1->r[i]/d > para->OA){
     if(node(tree2, j) && tree2->r[j]/d > para->OA){
       Npairs3D(para, tree1, tree1->left[i],  tree2, tree2->left[j],  0); 
@@ -1040,8 +1117,13 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     Npairs3D(para, tree1, i, tree2,  tree2->right[j], 0); 
   }else{
     
-    pi         = ABS(tree1->distComo[i] - tree2->distComo[j]);
-    rp         = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
+    pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
+    rp = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
+    
+    if(para->proj == PHYS){
+      pi /= 1.0+z_tree1;
+      rp /= 1.0+z_tree1; /* Distances in physical coordinates (Mpc) */
+    }
     
     if(para->log){
       pi = log(pi);
@@ -1057,6 +1139,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
       for(l=0;l<para->nsamples;l++){
 	result.NN[m + para->nbins*(k + (para->nbins*(l+1)))] += NN*tree1->w[para->nsamples*i + l]*tree2->w[para->nsamples*j + l];
       }
+      result.meanR[m] += rp*NN;
     }
     
     count += tree1->N[i]*tree2->N[j];
@@ -1066,12 +1149,20 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
   if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
   
   if(firstCall && tree1 == tree2){
-    for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++) result.NN[k] *= 2;
+    for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++){
+      result.NN[k] *= 2;
+    }
+    for(k = 0; k < para->nbins; k++){
+      result.meanR[k] *= 2;
+    }
+    
   }
   
   return result;
 }
 
+#undef z_tree1       
+#undef distComo_tree1
 
 Result gg(const Config *para, const Tree *lens, const long i, const Tree *source, const long j, int firstCall){
   /* Computes the galaxy-galaxy two-point correlation function. */
@@ -1093,7 +1184,7 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
     result.Nsources = (double *)malloc(para->nbins*sizeof(double));
     result.meanR    = (double *)malloc(para->nbins*sizeof(double));
     result.e2       = (double *)malloc(para->nbins*sizeof(double));
-    for(k = 0; k < para->nbins; k++){
+   for(k = 0; k < para->nbins; k++){
       result.Nsources[k] = 0.0; 
       result.meanR[k]    = 0.0;
       result.e2[k]       = 0.0;
@@ -1165,7 +1256,6 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
     exit(EXIT_FAILURE);
     break;
   }
-
   
   /* dA = phy_dis/angular_size_in_radians = tran_como_dis/(1+z)*/
   dA  = distComo_lens/(1.0 + z_lens);               /* Angular diameter distance in physical coordinates */
@@ -1208,7 +1298,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
     result.w[k]  += w;
     for(l=0;l<para->nsamples;l++){
       result.GG[para->nbins*(l+1) + k] += GG*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
-      result.w[para->nbins*(l+1) + k]  += w*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
+      result.w[para->nbins*(l+1) + k]  +=  w*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
     }    
     /* keep track of info per bin */
     result.Nsources[k] += 1.0;
@@ -1243,6 +1333,7 @@ void freeResult(const Config para, Result result){
     free(result.N1);
     free(result.N2);
     free(result.NN);
+    free(result.meanR);
     break;
   case GGLENS:
     free(result.GG);
@@ -1276,33 +1367,33 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     /* allocate memory slots (see structure description in main.h)*/
     result.left   = (long *)malloc(result.size*sizeof(long)); 
     result.right  = (long *)malloc(result.size*sizeof(long)); 
-    result.N      = (long *)malloc(result.size*sizeof(long)); 
+    result.N      = (double *)malloc(result.size*sizeof(double)); 
     result.r      = (double *)malloc(result.size*sizeof(double));
     result.w      = (char *)malloc(result.size*para->nsamples*sizeof(char));
-    result.Ntot   = (long *)malloc(para->nsamples*sizeof(long));
+    result.Ntot   = (double *)malloc(para->nsamples*sizeof(double));
     result.point  = createPoint(*para, result.size);
-    if(para->coordType == RADEC){
+    if(para->corr != AUTO_3D && para->corr != CROSS_3D){
       result.cosx   =  (double *)malloc(2*result.size*sizeof(double)); 
       result.sinx   =  (double *)malloc(2*result.size*sizeof(double)); 
     }
-    if(para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP ){
+    if(para->proj == COMO || para->proj == PHYS){
       result.distComo = (double *)malloc(result.size*sizeof(double));
     }
     
     count = index = ROOT;                                       /* index of the root (= 0) */
     for(i=0;i<result.size*para->nsamples;i++) result.w[i] = 0;  /* set weights to 0        */
-    for(i=0;i<para->nsamples;i++) result.Ntot[i] = 0;           /* initialize Ntot         */
-
+    for(i=0;i<para->nsamples;i++) result.Ntot[i] = 0.0;         /* initialize Ntot         */
     
   }
-  
-  
-  local_index = count++;           /* index of THIS node             */
-  result.N[local_index] = data->N; /* number of points for THIS node */
+    
+  local_index = count++;                   /* index of THIS node             */
+  //  result.N[local_index] = data->N; /* weighted number of points for THIS node */
   
   /* get mean properties of points inside the node <=> "weighted" center */
   getMeanPoint(*para, result.point, local_index, *data);
   
+  /* total weigthed number of objects (N X mean weight)*/
+  result.N[local_index] = (double)data->N*result.point.w[local_index];
 
   /* set weights from mask */
   for(j=0;j<para->nsamples;j++){  /* loop over subsamples */
@@ -1320,16 +1411,15 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   }
 
   /* pre-computed quantities */
-  if(para->coordType == RADEC){
-    result.cosx[2*local_index+0] = cos(result.point.x[NDIM*local_index+0]*PI/180.0);
-    result.cosx[2*local_index+1] = cos(result.point.x[NDIM*local_index+1]*PI/180.0);   
-    result.sinx[2*local_index+0] = sin(result.point.x[NDIM*local_index+0]*PI/180.0);
-    result.sinx[2*local_index+1] = sin(result.point.x[NDIM*local_index+1]*PI/180.0);   
+  if(para->corr != AUTO_3D && para->corr != CROSS_3D){
+   result.cosx[2*local_index+0] = cos(result.point.x[NDIM*local_index+0]*PI/180.0);
+   result.cosx[2*local_index+1] = cos(result.point.x[NDIM*local_index+1]*PI/180.0);   
+   result.sinx[2*local_index+0] = sin(result.point.x[NDIM*local_index+0]*PI/180.0);
+   result.sinx[2*local_index+1] = sin(result.point.x[NDIM*local_index+1]*PI/180.0);   
   }
-  if(para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP ){
-   result.distComo[local_index] = distComo(result.point.x[NDIM*local_index+2], para->a);
-  }
-  
+  if(para->proj == COMO || para->proj == PHYS){
+    result.distComo[local_index] = distComo(result.point.x[NDIM*local_index+2], para->a);
+  }  
     
   /* compute node radius "r" for the open-angle approximation. r is defined as
    * the distance between the weighted center and the most distant point (angular 
@@ -1343,6 +1433,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
 
   /* test if deleting the Cart coordinates will slow down or not */
 
+  
   dMax = 0.0; maxPoint = 0;
   for(n=0;n<data->N;n++){
     d = distAngPointCart(para, &(result.point), &local_index, data, &n);
@@ -1351,19 +1442,18 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
       dMax     = d;
     }
   }
-  if(para->coordType == RADEC){
+  
+  if(para->corr != AUTO_3D && para->corr != CROSS_3D){
     result.r[local_index] = distAngPointSpher(para, &(result.point), &local_index, data, &maxPoint);
   }else{
     result.r[local_index] = d;
   }
-  
+    
   /* if wp, use physical distance THIS DOES NOT SEEM TO WORK PROPERLY ???*/
   if(para->corr == AUTO_WP || para->corr == CROSS_WP ){
     //result.r[local_index]  = result.distComo[local_index]*result.r[local_index]*PI/180.0;
   }
   
-
-
   if(data->N > NLEAF){   /* node ----------------------------- */
     
     Point dataLeft, dataRight;
@@ -1384,9 +1474,9 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     result.left[local_index]  = -1;
     result.right[local_index] = -1;
     
-    /* keep track of the total number of objects per sample */
+    /* keep track of the total number of objects in the tree per sample */
     for(i=0;i<para->nsamples;i++){  
-      result.Ntot[i] += NLEAF*result.w[para->nsamples*local_index + i];
+      result.Ntot[i] += result.point.w[local_index]*(double)NLEAF*result.w[para->nsamples*local_index + i];
     }
   }
   
@@ -1536,12 +1626,12 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
 
 void freeTree(const Config para, Tree tree){
   /* Frees the tree "tree". */
-
-  if(para.coordType == RADEC){
+  
+  if(para.corr != AUTO_3D && para.corr != CROSS_3D){
     free(tree.cosx);
     free(tree.sinx);
   }
-  if(para.corr == GGLENS || para.corr == AUTO_WP || para.corr == CROSS_WP){
+  if(para.proj == COMO || para.proj == PHYS){
     free(tree.distComo);
   }
   
@@ -1641,16 +1731,18 @@ double distAngSpher(const Tree *a, const long *i, const Tree *b, const long *j){
   return 2.0*asin(sqrt(MAX(EPS/100.0,sin2_dec + a->cosx[2*(*i)+1]*b->cosx[2*(*j)+1]*sin2_ra)))*180.0/PI;
 }
 
-double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j){
-/*Returns the angular distance between nodes
- * a[i] and b[j]. Cartesian coordinates.
- */
+
+/* this function will be deprecated */
+/* double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j){ */
+/* /\*Returns the angular distance between nodes */
+/*  * a[i] and b[j]. Cartesian coordinates. */
+/*  *\/ */
   
-  double d0 = (b->point.x[NDIM*(*j)+0] - a->point.x[NDIM*(*i)+0]);
-  double d1 = (b->point.x[NDIM*(*j)+1] - a->point.x[NDIM*(*i)+1]);
+/*   double d0 = (b->point.x[NDIM*(*j)+0] - a->point.x[NDIM*(*i)+0]); */
+/*   double d1 = (b->point.x[NDIM*(*j)+1] - a->point.x[NDIM*(*i)+1]); */
   
-  return sqrt(d0*d0 + d1*d1);
-}
+/*   return sqrt(d0*d0 + d1*d1); */
+/* } */
 
 
 double dist3D(const Tree *a, const long *i, const Tree *b, const long *j){
@@ -1713,12 +1805,11 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
 	MPI_Send(&data->N, 1, MPI_LONG, rank, BASE+0, MPI_COMM_WORLD);
 	MPI_Send(&dim, 1, MPI_INT, rank, BASE+1, MPI_COMM_WORLD);
 	MPI_Send(data->x,data->N*NDIM, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD);
-	
+	MPI_Send(data->w   , data->N, MPI_DOUBLE, rank, BASE+6, MPI_COMM_WORLD);
 	if(para.corr == GGLENS){
 	  MPI_Send(data->zerr, data->N, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD);
 	  MPI_Send(data->e1  , data->N, MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD);
 	  MPI_Send(data->e2  , data->N, MPI_DOUBLE, rank, BASE+5, MPI_COMM_WORLD);
-	  MPI_Send(data->w   , data->N, MPI_DOUBLE, rank, BASE+6, MPI_COMM_WORLD);
 	}
 	
       }else{ 
@@ -1730,18 +1821,18 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
 	 */
 	
 	dataParent->x = (double *)memmove(dataParent->x, data->x, data->N*NDIM*sizeof(double));
+	dataParent->w    = (double *)memmove(dataParent->w,    data->w ,   data->N*sizeof(double));
 	if(para.corr == GGLENS){
 	  dataParent->zerr = (double *)memmove(dataParent->zerr, data->zerr, data->N*sizeof(double));
 	  dataParent->e1   = (double *)memmove(dataParent->e1,   data->e1,   data->N*sizeof(double));
 	  dataParent->e2   = (double *)memmove(dataParent->e2,   data->e2,   data->N*sizeof(double));
-	  dataParent->w    = (double *)memmove(dataParent->w,    data->w ,   data->N*sizeof(double));
 	}
 	dataParent->x = (double *)realloc(dataParent->x, data->N*NDIM*sizeof(double));	
+	dataParent->w    = (double *)realloc(dataParent->w,    data->N*sizeof(double));
 	if(para.corr == GGLENS){
 	  dataParent->zerr = (double *)realloc(dataParent->zerr, data->N*sizeof(double));
 	  dataParent->e1   = (double *)realloc(dataParent->e1,   data->N*sizeof(double));
 	  dataParent->e2   = (double *)realloc(dataParent->e2,   data->N*sizeof(double));
-	  dataParent->w    = (double *)realloc(dataParent->w,    data->N*sizeof(double));
 	}
 	
 	/* copy the new number of points and the dim 
@@ -1765,15 +1856,16 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
     data->x = (double *)malloc(data->N*NDIM*sizeof(double));
     MPI_Recv(data->x, data->N*NDIM, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD, &status);
     
+    data->w    = (double *)malloc(data->N*sizeof(double));
+    MPI_Recv(data->w   , data->N, MPI_DOUBLE, MASTER, BASE+6, MPI_COMM_WORLD, &status);
+
     if(para.corr == GGLENS){
       data->zerr = (double *)malloc(data->N*sizeof(double));
       data->e1   = (double *)malloc(data->N*sizeof(double));
       data->e2   = (double *)malloc(data->N*sizeof(double));
-      data->w    = (double *)malloc(data->N*sizeof(double));
       MPI_Recv(data->zerr, data->N, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD, &status);
       MPI_Recv(data->e1  , data->N, MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD, &status);
       MPI_Recv(data->e2  , data->N, MPI_DOUBLE, MASTER, BASE+5, MPI_COMM_WORLD, &status);
-      MPI_Recv(data->w   , data->N, MPI_DOUBLE, MASTER, BASE+6, MPI_COMM_WORLD, &status);
     }
   }
   
@@ -1793,9 +1885,10 @@ void comResult(const Config para, Result result, long Ncpu, int split){
   if(para.rank != MASTER){
     switch(para.corr){
     case AUTO: case CROSS:
-      MPI_Send(result.NN, para.nbins*(para.nsamples+1), MPI_LONG, MASTER, BASE+0, MPI_COMM_WORLD);
-      MPI_Send(result.N1, para.nsamples+1, MPI_LONG, MASTER, BASE+1, MPI_COMM_WORLD);
-      MPI_Send(result.N2, para.nsamples+1, MPI_LONG, MASTER, BASE+2, MPI_COMM_WORLD);
+      MPI_Send(result.NN, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
+      MPI_Send(result.N1, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
+      MPI_Send(result.N2, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
+      MPI_Send(result.meanR,    para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
       break;
     case GGLENS:
       MPI_Send(result.GG, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
@@ -1805,9 +1898,11 @@ void comResult(const Config para, Result result, long Ncpu, int split){
       MPI_Send(result.e2,       para.nbins, MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
       break;
     case AUTO_WP: case CROSS_WP:
-      MPI_Send(result.NN, para.nbins*para.nbins*(para.nsamples+1), MPI_LONG, MASTER, BASE+0, MPI_COMM_WORLD);
-      MPI_Send(result.N1, para.nsamples+1, MPI_LONG, MASTER, BASE+1, MPI_COMM_WORLD);
-      MPI_Send(result.N2, para.nsamples+1, MPI_LONG, MASTER, BASE+2, MPI_COMM_WORLD);
+      MPI_Send(result.NN,    para.nbins*para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
+      MPI_Send(result.N1,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
+      MPI_Send(result.N2,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
+      MPI_Send(result.meanR, para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
+
       break;
     }
   }else{
@@ -1817,14 +1912,19 @@ void comResult(const Config para, Result result, long Ncpu, int split){
       
       switch(para.corr){
       case AUTO: case CROSS:
-	slave.NN = (long *)malloc(para.nbins*(para.nsamples+1)*sizeof(long));
-	slave.N1 = (long *)malloc((para.nsamples+1)*sizeof(long)); 
-	slave.N2 = (long *)malloc((para.nsamples+1)*sizeof(long)); 
+	slave.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(long));
+	slave.N1    = (double *)malloc((para.nsamples+1)*sizeof(double)); 
+	slave.N2    = (double *)malloc((para.nsamples+1)*sizeof(double)); 
+	slave.meanR = (double *)malloc(para.nbins*sizeof(double));
 	for(rank=1;rank<Ncpu;rank++){
-	  MPI_Recv(slave.NN, para.nbins*(para.nsamples+1), MPI_LONG, rank, BASE+0, MPI_COMM_WORLD, &status);
-	  MPI_Recv(slave.N1, para.nsamples+1, MPI_LONG, rank, BASE+1, MPI_COMM_WORLD, &status);
-	  MPI_Recv(slave.N2, para.nsamples+1, MPI_LONG, rank, BASE+2, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.NN,    para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
 	  for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
+	  for(i=0;i<para.nbins;i++){
+	    result.meanR[i]    += slave.meanR[i];
+	  }
 	  if(split){
 	    /* only N2 may be partitioned */
 	    for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
@@ -1855,14 +1955,19 @@ void comResult(const Config para, Result result, long Ncpu, int split){
 	}
 	break;
       case AUTO_WP: case CROSS_WP:
-	slave.NN = (long *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(long));
-	slave.N1 = (long *)malloc((para.nsamples+1)*sizeof(long)); 
-	slave.N2 = (long *)malloc((para.nsamples+1)*sizeof(long)); 
+	slave.NN = (double *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(double));
+	slave.N1 = (double *)malloc((para.nsamples+1)*sizeof(double)); 
+	slave.N2 = (double *)malloc((para.nsamples+1)*sizeof(double)); 
+	slave.meanR = (double *)malloc(para.nbins*para.nbins*sizeof(double));
 	for(rank=1;rank<Ncpu;rank++){
-	  MPI_Recv(slave.NN, para.nbins*para.nbins*(para.nsamples+1), MPI_LONG, rank, BASE+0, MPI_COMM_WORLD, &status);
-	  MPI_Recv(slave.N1, para.nsamples+1, MPI_LONG, rank, BASE+1, MPI_COMM_WORLD, &status);
-	  MPI_Recv(slave.N2, para.nsamples+1, MPI_LONG, rank, BASE+2, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.NN,    para.nbins*para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
 	  for(i=0;i<para.nbins*para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
+	  for(i=0;i<para.nbins;i++){
+	    result.meanR[i] += slave.meanR[i];
+	  }
 	  if(split){
 	    /* only N2 may be partitioned */
 	    for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
@@ -1912,7 +2017,7 @@ void initPara(int argc, char **argv, Config *para){
     para->ran2Id[i]  = i+1;
   }
   NDIM            = 2; /* number of dimensions, 2 or 3 */
-  para->coordType = RADEC;
+  //para->coordType = RADEC;
   para->distAng   = &distAngSpher;
   para->proj      = THETA;
   para->corr      = AUTO;
@@ -1928,6 +2033,7 @@ void initPara(int argc, char **argv, Config *para){
   para->xi        = 0;
   para->deltaz    = 0.03;
   para->pi_max    = 40.0;
+  para->weighted  = 0;
   strcpy(para->fileOutName,   "corr.out");
   
   /* only master talks */
@@ -1951,11 +2057,11 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.15\n\n	\
-Program to compute two-point correlation functions.\n\
-Usage:  %s -c configFile [options]: run the program\n\
+                (Super W Of Theta) MPI version 0.2\n\n	\
+Program to compute two-point correlation functions.\n	\
+Usage:  %s -c configFile [options]: run the program\n	\
         %s -d: display a default configuration file\n\
-Important: if using \"RADEC\" coordinates, the angle\n\
+Important: for RA/DEC coordinates, the angle\n			\
 in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       }
       exit(EXIT_FAILURE);
@@ -1966,46 +2072,44 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("#----------------------------------------------------------#\n");
       printf("#Input catalogues                                          #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("data1          %s  #input data catalogue #1\n",    para->fileInName1);
-      printf("cols1          %d,%d\t  #Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
-      printf("data2          %s  #input data catalogue #2\n",    para->fileInName2);
-      printf("cols2          %d,%d\t  #Column ids for data2\n",  para->data2Id[0],para->data2Id[1]);
-      printf("ran1           %s\t  #input random catalogue #1\n",para->fileRanName1);
-      printf("rancols1       %d,%d\t  #Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
-      printf("ran2           %s\t  #input random catalogue #2\n",para->fileRanName2);
-      printf("rancols2       %d,%d\t  #Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
-      printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
-      printf("                    \t  #in degrees if RADEC\n");
+      printf("data1          %s  # input data catalogue #1\n",    para->fileInName1);
+      printf("cols1          %d,%d\t  # Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
+      printf("data2          %s  # input data catalogue #2\n",    para->fileInName2);
+      printf("cols2          %d,%d\t  # Column ids for data2\n",  para->data2Id[0],para->data2Id[1]);
+      printf("ran1           %s\t  # input random catalogue #1\n",para->fileRanName1);
+      printf("rancols1       %d,%d\t  # Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
+      printf("ran2           %s\t  # input random catalogue #2\n",para->fileRanName2);
+      printf("rancols2       %d,%d\t  # Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
+      //   printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
+      //printf("                    \t  #in degrees if RADEC\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Correlation options                                       #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("corr           auto\t #Type of correlation: [auto,cross,gglens,auto_wp,cross_wp]\n");
-      printf("est            ls\t #Estimator [ls,nat,ham]\n");
-      printf("range          %g,%g\t #Correlation range. Unity same as \"coord\":\n", para->min, para->max);
-      printf("                    \t #in degrees for RADEC, in Mpc otherwise)\n");
-      printf("nbins          %d\t #Number of bins\n", para->nbins);
-      printf("log            yes\t #Logarithmic bins [yes,no]\n");
-      printf("err            jackknife #Resampling method [bootstrap,jackknife]\n");
-      printf("nsamples       %d\t #Number of samples for resampling (power of 2)\n", para->nsamples);
-      printf("OA             %g\t #Open angle for approximation (value or \"no\") \n", para->OA);
+      printf("corr           auto\t # Type of correlation: [auto,cross,gglens,auto_wp,cross_wp]\n");
+      printf("est            ls\t # Estimator [ls,nat,ham]\n");
+      printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
+      printf("nbins          %d\t # Number of bins\n", para->nbins);
+      printf("log            yes\t # Logarithmic bins [yes,no]\n");
+      printf("err            jackknife # Resampling method [bootstrap,jackknife]\n");
+      printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
+      printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("#----------------------------------------------------------#\n");
       printf("#Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))  #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("H0             %g\t #Hubble parameter\n", para->a[0]);
-      printf("Omega_M        %g\t #Relative matter density\n", para->a[1]);
-      printf("Omega_L        %g\t #Relative energy density (Lambda)\n", para->a[2]);
-      printf("deltaz         %g\t #For gg lensing: Zsource > Zlens + deltaz\n", para->deltaz);
-      printf("pi_max         %g\t #For wp: limit for pi integration\n", para->pi_max);
+      printf("H0             %g\t # Hubble parameter\n", para->a[0]);
+      printf("Omega_M        %g\t # Relative matter density\n", para->a[1]);
+      printf("Omega_L        %g\t # Relative energy density (Lambda)\n", para->a[2]);
+      printf("deltaz         %g\t # For gg lensing: Zsource > Zlens + deltaz\n", para->deltaz);
+      printf("pi_max         %g\t # For wp: limit for pi integration\n", para->pi_max);
       printf("#----------------------------------------------------------#\n");
       printf("#Output options                                            #\n");
       printf("#----------------------------------------------------------#\n");
-      printf("proj           theta\t #Axis projection:\n");
-      printf("                    \t #if coord = RADEC, [phys,theta]\n");
-      printf("                    \t #if coord = CART3D, RADEC_Z [phys] \n");
-      printf("                    \t #if corr  = gglens, [como,phys]\n");
-      printf("out            %s\t #Output file\n", para->fileOutName);
-      printf("cov            no\t #Covariance matrix of errors [yes,no] (in \"out\".cov)\n");
-      printf("xi             no\t #xi(rp, pi) for auto_wp [yes,no] (in \"out\".xi)\n");
+      printf("proj           theta\t # Axis projection [theta, como, phys:\n");
+      printf("                    \t # auto, cross: default: theta (deg)\n");
+      printf("                    \t # auto_wp, cross_wp, gglens: default: como (Mpc)\n");
+      printf("out            %s\t # Output file\n", para->fileOutName);
+      printf("cov            no\t # Covariance matrix of errors [yes,no] (in \"out\".cov)\n");
+      printf("xi             no\t # xi(rp, pi) for auto_wp [yes,no] (in \"out\".xi)\n");
       exit(EXIT_FAILURE);
     }
   }
@@ -2031,35 +2135,24 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   }
 
   /* ----------------------------------------------------------------------
-   *STEP 3: third loop over arguments. Read the command line options                                 
+   * STEP 3: third loop over arguments. Read the command line options                                 
    * (overwrite config file option). */
   for(i=0;i<argc;i++){
-    if(*argv[i] == '-') setPara(argv[i]+1, argv[i+1],para);
+    if(*argv[i] == '-') setPara(argv[i]+1, argv[i+1], para);
   }
   
   /* ----------------------------------------------------------------------
-   *STEP 4: readjust parameters if needed */
-  if(para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP ){
-    NDIM  = 3;
-    if(para->proj == THETA){
-      para->proj = COMO; /*Default projection for gg lensing and wp*/
-    }
-  }
+   * STEP 4: readjust parameters if needed */
   
-  /* set the angular distance measurement method */
-  switch(para->coordType)
-    {
-    case RADEC:
-      para->distAng = &distAngSpher;
-      break;
-    case CART:
-      para->distAng = &distAngCart;
-      break;
-    case CART3D:
-      NDIM = 3;
-      para->distAng = &dist3D;
-      break;
-    }
+  /* Default projection for gg lensing and wp */
+  if( (para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP) && para->proj == THETA ){
+    para->proj = COMO; 
+  }
+  /* Adjust number of dimensions */
+  if(para->proj == COMO || para->proj == PHYS) NDIM  = 3;
+  
+  //To do implement: cart 3D
+  //para->distAng = &dist3D;
   
   if(para->log){
     if(para->min < EPS){
@@ -2122,12 +2215,14 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     getStrings(arg,list,",",&Ncol);
     for(j=0;j<Ncol;j++)  para->ran2Id[j] = getIntValue(list,j+1);
+    /*
   }else if(!strcmp(field,"coord")) {
     checkArg(field,arg,para);
     if(!strcmp(arg,"RADEC"))        para->coordType = RADEC;
     else if(!strcmp(arg,"CART"))    para->coordType = CART;
     else if(!strcmp(arg,"CART3D"))  para->coordType = CART3D;
     else checkArg(field, NULL, para);
+    */
   }else if(!strcmp(field,"corr")) {
     checkArg(field, arg, para);
     if(!strcmp(arg,"cross"))         para->corr = CROSS;
@@ -2138,7 +2233,7 @@ void setPara(char *field, char *arg, Config *para){
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"proj")) {
     checkArg(field,arg,para);
-    if(!strcmp(arg,"theta")) para->proj = THETA;
+    if(!strcmp(arg,"theta"))      para->proj = THETA;
     else if(!strcmp(arg,"como"))  para->proj = COMO;
     else if(!strcmp(arg,"phys"))  para->proj = PHYS;
     else checkArg(field, NULL, para);
@@ -2186,6 +2281,8 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"pi_max")){
     checkArg(field,arg,para);
     para->pi_max  = atof(arg);
+  }else if(!strcmp(field,"weighted")){
+    para->weighted = 1;
   }else if(!strcmp(field,"out") || !strcmp(field,"o")){
     checkArg(field,arg,para);
     strcpy(para->fileOutName,arg);
@@ -2391,11 +2488,11 @@ void copyPoint(const Config para, Point a, long i, Point b, long j){
   long dim;
   
   for(dim=0;dim<NDIM;dim++) a.x[NDIM*i+dim] = b.x[NDIM*j+dim];
+  a.w[i]    = b.w[j];
   if(para.corr == GGLENS){
     a.zerr[i] = b.zerr[j];
     a.e1[i]   = b.e1[j];
     a.e2[i]   = b.e2[j];
-    a.w[i]    = b.w[j];
   }
   
   return;
@@ -2412,29 +2509,29 @@ void getMeanPoint(const Config para, Point a, long i, Point point){
   long n, dim;
   /* set to zero */
   for(dim=0;dim<NDIM;dim++) a.x[NDIM*i+dim] = 0.0;
+  a.w[i]    = 0.0;
   if(para.corr == GGLENS){
     a.zerr[i] = 0.0;
     a.e1[i]   = 0.0;
     a.e2[i]   = 0.0;
-    a.w[i]    = 0.0;
   }
   /* sum up */
   for(n=0;n<point.N;n++){
     for(dim=0;dim<NDIM;dim++) a.x[NDIM*i+dim] += point.x[NDIM*n+dim];
+    a.w[i]    +=  point.w[n];
     if(para.corr == GGLENS){
       a.zerr[i] +=  point.zerr[n];
       a.e1[i]   +=  point.e1[n];
       a.e2[i]   +=  point.e2[n];
-      a.w[i]    +=  point.w[n];
     }
   }
   /* divide by N */
   for(dim=0;dim<NDIM;dim++) a.x[NDIM*i+dim] /= (double)point.N;
+  a.w[i]    /= (double)point.N;
   if(para.corr == GGLENS){
     a.zerr[i] /= (double)point.N;
     a.e1[i]   /= (double)point.N;
     a.e2[i]   /= (double)point.N;
-    a.w[i]    /= (double)point.N;
   }
   
   return;
@@ -2451,11 +2548,11 @@ void copyPointAddress(const Config para, Point *a, const Point b, long shift){
   long dim;
   
   a->x = b.x + shift*NDIM;
+  a->w = b.w + shift;
   if(para.corr == GGLENS){
     a->zerr = b.zerr + shift;
     a->e1   = b.e1   + shift;
     a->e2   = b.e2   + shift;
-    a->w    = b.w    + shift;
   }
   
   return;
@@ -2473,6 +2570,9 @@ void swapPoint(const Config para, Point point,long i, long j){
     point.x[NDIM*i+dim] = point.x[NDIM*j+dim];
     point.x[NDIM*j+dim] = tmp;
   }
+  tmp           = point.w[i];
+  point.w[i]    = point.w[j];
+  point.w[j]    = tmp;
   if(para.corr == GGLENS){
     tmp           = point.zerr[i];
     point.zerr[i] = point.zerr[j];
@@ -2483,9 +2583,6 @@ void swapPoint(const Config para, Point point,long i, long j){
     tmp           = point.e2[i];
     point.e2[i]   = point.e2[j];
     point.e2[j]   = tmp;
-    tmp           = point.w[i];
-    point.w[i]    = point.w[j];
-    point.w[j]    = tmp;
   }
   
   return;
@@ -2499,11 +2596,11 @@ Point createPoint(const Config para, long N){
   point.dim = -1;  
   
   point.x = (double *)malloc(N*NDIM*sizeof(double));
+  point.w    = (double *)malloc(N*sizeof(double));
   if(para.corr == GGLENS){
     point.zerr = (double *)malloc(N*sizeof(double));
     point.e1   = (double *)malloc(N*sizeof(double));
     point.e2   = (double *)malloc(N*sizeof(double));
-    point.w    = (double *)malloc(N*sizeof(double));
   }
   
   return point;
@@ -2512,19 +2609,17 @@ Point createPoint(const Config para, long N){
 void freePoint(const Config para, Point point){
   
   free(point.x);
+  free(point.w);
   if(para.corr == GGLENS){
     free(point.zerr);
     free(point.e1);
     free(point.e2);
-    free(point.w);
   }
   
   return;
 }
 
-
-
-Point readCat(const Config para, char *fileInName, int id[NIDSMAX]){
+Point readCat(const Config para, char *fileInName, int id[NIDSMAX], int weighted){
   /* Reads fileIn and returns the data array 
    * (see header file for details about the 
    * data structure.
@@ -2544,7 +2639,7 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX]){
     /* if no point found in fileIn or if the number of 
      * points is less than the number of cpu (who knows...) 
      */
-    if(para.verbose) fprintf(stderr,"\n%s: **ERROR** no valid point found in the file or too many cpus. Exiting...\n", MYNAME);
+    if(para.verbose) fprintf(stderr,"\n%s: **WARNING** the number of points is lower than the number of cpus.\n", MYNAME);
     //  exit(EXIT_FAILURE);      
   }
   
@@ -2556,10 +2651,15 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX]){
     if(getStrings(line,item," ",&Ncol)){
       /* read the value at the column definied by "id[i]" */
       for(dim=0;dim<NDIM;dim++) data.x[NDIM*n+dim] = getDoubleValue(item,id[dim]);
+      if(weighted){
+	data.w[n] = getDoubleValue(item,id[NDIM+0]);
+	//DEBUGGING data.w[n] = 0.5;
+      }else{
+	data.w[n] = 1.0;
+      }
       if(para.corr == GGLENS){
 	Ncol -= 4;
 	//Check for positive values here ??
-	//TO DO add deltaz if definied in para file
 	data.zerr[n] = getDoubleValue(item,id[NDIM+0]);
 	data.e1[n]   = getDoubleValue(item,id[NDIM+1]);
 	data.e2[n]   = getDoubleValue(item,id[NDIM+2]);
@@ -2686,71 +2786,71 @@ long lowestPowerOfTwo(long n, long *pow){
  *obsolete                                                        *
  *----------------------------------------------------------------*/
 
-#define leaf(tree,node) ((tree)->left[(node)] == -1)
-#define node(tree,node) ((tree)->left[(node)] > -1)
+/* #define leaf(tree,node) ((tree)->left[(node)] == -1) */
+/* #define node(tree,node) ((tree)->left[(node)] > -1) */
 
-Result Npairs2(const Config *para, const Tree *tree1, const long root1, const Tree *tree2, const long root2){ 
-  /* returns the number of pairs if tree1 != tree2, and 2 times 
-   * the number of pairs if tree1 == tree2, so that the treatment of pairs 
-   * in w(theta) estimators is identical (numerical trick). As a result
-   * error bars must be divided by sqrt(2.0).
-   */
+/* Result Npairs2(const Config *para, const Tree *tree1, const long root1, const Tree *tree2, const long root2){  */
+/*   /\* returns the number of pairs if tree1 != tree2, and 2 times  */
+/*    * the number of pairs if tree1 == tree2, so that the treatment of pairs  */
+/*    * in w(theta) estimators is identical (numerical trick). As a result */
+/*    * error bars must be divided by sqrt(2.0). */
+/*    *\/ */
   
-  long N, k, count = 0;
-  Result result;
-  result.NN = (long *)malloc(para->nbins*sizeof(long)); 
-  for(k = 0; k < para->nbins; k++) result.NN[k] = 0;  
+/*   long N, k, count = 0; */
+/*   Result result; */
+/*   result.NN = (long *)malloc(para->nbins*sizeof(long));  */
+/*   for(k = 0; k < para->nbins; k++) result.NN[k] = 0;   */
   
-  double d;
+/*   double d; */
   
-  long i, j, stackIndex1 = 0, stackIndex2 = 0, stack1[NSTACK], stack2[NSTACK];
-  i = root1;
-  for(;;){
-    j = root2;
-    for(;;){
-      /* computes only half of the pairs for auto-correlation */
-      if(tree1 == tree2 && i < j) goto skip;
-      d = para->distAng(tree1, &i, tree2, &j);
-      if(node(tree1,i) && tree1->r[i]/d > para->OA){   /* go down tree1        */
-	stack1[stackIndex1++] = tree1->right[i];       /* put right node on the stack1  */
-	i                     = tree1->left[i];        /* process left node immediately */
-	if(node(tree2,j) && tree2->r[j]/d > para->OA){ /* go down tree2      */
-	  stack2[stackIndex2++] = tree2->right[j];
-	  j                     = tree2->left[j];
-	}
-      }else if(node(tree2,j) && tree2->r[j]/d > para->OA){ /* go down tree2  */
-	stack2[stackIndex2++] = tree2->right[j];
-	j                     = tree2->left[j];
-      }else{
-	//if(tree1 == tree2 && i == j) goto skip;
-	if(para->log) d = log(d);
-	k = floor((d - para->min)/para->Delta);
-	if(k < para->nbins){
-	  if(k >= 0) result.NN[k] += tree1->N[i]*tree2->N[j];
-	}
-      skip: if(stackIndex2 == 0) break;  /* has visited all nodes in tree2..       */        
-	j = stack2[--stackIndex2];       /* ...or will process next on the stack   */       
-      }
-    }
-    if(stackIndex1 == 0) break;
-    i = stack1[--stackIndex1];
-    printCount(i+1,tree1->size,100,para->verbose);
-  }
+/*   long i, j, stackIndex1 = 0, stackIndex2 = 0, stack1[NSTACK], stack2[NSTACK]; */
+/*   i = root1; */
+/*   for(;;){ */
+/*     j = root2; */
+/*     for(;;){ */
+/*       /\* computes only half of the pairs for auto-correlation *\/ */
+/*       if(tree1 == tree2 && i < j) goto skip; */
+/*       d = para->distAng(tree1, &i, tree2, &j); */
+/*       if(node(tree1,i) && tree1->r[i]/d > para->OA){   /\* go down tree1        *\/ */
+/* 	stack1[stackIndex1++] = tree1->right[i];       /\* put right node on the stack1  *\/ */
+/* 	i                     = tree1->left[i];        /\* process left node immediately *\/ */
+/* 	if(node(tree2,j) && tree2->r[j]/d > para->OA){ /\* go down tree2      *\/ */
+/* 	  stack2[stackIndex2++] = tree2->right[j]; */
+/* 	  j                     = tree2->left[j]; */
+/* 	} */
+/*       }else if(node(tree2,j) && tree2->r[j]/d > para->OA){ /\* go down tree2  *\/ */
+/* 	stack2[stackIndex2++] = tree2->right[j]; */
+/* 	j                     = tree2->left[j]; */
+/*       }else{ */
+/* 	//if(tree1 == tree2 && i == j) goto skip; */
+/* 	if(para->log) d = log(d); */
+/* 	k = floor((d - para->min)/para->Delta); */
+/* 	if(k < para->nbins){ */
+/* 	  if(k >= 0) result.NN[k] += tree1->N[i]*tree2->N[j]; */
+/* 	} */
+/*       skip: if(stackIndex2 == 0) break;  /\* has visited all nodes in tree2..       *\/         */
+/* 	j = stack2[--stackIndex2];       /\* ...or will process next on the stack   *\/        */
+/*       } */
+/*     } */
+/*     if(stackIndex1 == 0) break; */
+/*     i = stack1[--stackIndex1]; */
+/*     printCount(i+1,tree1->size,100,para->verbose); */
+/*   } */
   
-  if(para->verbose) printf("\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
+/*   if(para->verbose) printf("\b\b\b\b\b\b\b%6.2f%%\n",100.0);  */
   
-  if(tree1 == tree2){
-    /* ATTENTION: this is not accurate if the number of objects is small.
-     * [Jean] I was thinking that a way to deal with it would be to
-     * check whether sqrt(1+8*NN) is rational or not. If it is then
-     * NN *= 2 is correct; if not, n = sqrt(2*NN) and NN(true) = n*(n-1)/2. 
-     * I'm wondering if this is a problem or not, given that we 
-     * deal with large samples. However at small scales we have very few 
-     * objects, so it could be a problem.*/
-       for(k = 0; k < para->nbins; k++) result.NN[k] *= 2;
-  }
+/*   if(tree1 == tree2){ */
+/*     /\* ATTENTION: this is not accurate if the number of objects is small. */
+/*      * [Jean] I was thinking that a way to deal with it would be to */
+/*      * check whether sqrt(1+8*NN) is rational or not. If it is then */
+/*      * NN *= 2 is correct; if not, n = sqrt(2*NN) and NN(true) = n*(n-1)/2.  */
+/*      * I'm wondering if this is a problem or not, given that we  */
+/*      * deal with large samples. However at small scales we have very few  */
+/*      * objects, so it could be a problem.*\/ */
+/*        for(k = 0; k < para->nbins; k++) result.NN[k] *= 2; */
+/*   } */
   
-  return result;  
+/*   return result;   */
   
   /* Alternative algorithms:
   
@@ -2814,5 +2914,5 @@ Result Npairs2(const Config *para, const Tree *tree1, const long root1, const Tr
   //if(para->verbose) printf("\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
   
   //return result;
-}
+//}
 

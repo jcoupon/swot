@@ -38,9 +38,11 @@
 #define SUCCESS     1
 #define ODD         0
 #define EVEN        1
+/*
 #define RADEC       0
 #define CART        1
 #define CART3D      2
+*/
 #define COMO        0
 #define THETA       1
 #define PHYS        2
@@ -50,6 +52,8 @@
 #define AUTO_WP     2
 #define CROSS_WP    3
 #define GGLENS      4
+#define AUTO_3D     5
+#define CROSS_3D    6
 
 #define LS          0
 #define NAT         1
@@ -79,7 +83,8 @@ typedef struct Point
 {
   /* number of points */
   long N;
-  
+  //  double Nweighted;
+
   /* dimension along which they are sorted 
      (ascending order). -1 if not.  */
   int dim;
@@ -106,13 +111,13 @@ typedef struct Tree
   long size;
   
   /* each of these have "size" elements (2 times for cosx and sinx) */
-  long *left, *right, *N;
+  long *left, *right;
   double *cosx, *sinx, *r, *distComo;
   
   /* total number of objects per  sample
    * (for the whole sample it is tree.N[ROOT])
    */
-  long *Ntot;
+  double *N, *Ntot;
   
   /* statistical weights for each sample */ 
   char *w;
@@ -138,10 +143,10 @@ typedef struct Result
   /* total number of points for the normalization, 
    * size = (nsamples+1)
    */
-  long *N1, *N2;
+  double *N1, *N2;
   
   /* number of pairs, size = nbins*(nsamples+1) */
-  long *NN;
+  double *NN;
   
   /* for GG lensing, size = (nbins*nsamples+1) */
   double *GG, *w;
@@ -167,9 +172,11 @@ typedef struct Config
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
-    corr, coordType, log, Ninfo, proj, xi;
+    corr,  log, Ninfo, proj, xi, weighted;
   double deltaz, min, max, Delta, OA, pi_max; 
   
+  //coordType
+
   /* error method JACKKNIFE or BOOTSTRAP */
   int err, nsamples;
   
@@ -222,7 +229,7 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
 long countNodes(long N, long NLeaf);
 double distAngPointCart(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double distAngPointSpher(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
-double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j);
+//double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j);
 double distAngPoint(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double dist3D(const Tree *a, const long *i, const Tree *b, const long *j);
 
@@ -255,7 +262,7 @@ void copyPoint(const Config para, Point a, long i, Point b, long j);
 void copyPointAddress(const Config para, Point *a, Point b, long shift);
 void getMeanPoint(const Config para, Point a, long i, Point point);
 void swapPoint(const Config para, Point point,long i, long j);
-Point readCat(const Config para, char *fileInName, int id[NIDSMAX]);
+Point readCat(const Config para, char *fileInName, int id[NIDSMAX], int weighted);
 FILE *fopenAndCheck(const char *fileName, char *mode, int verbose);
 int getStrings(char *line, char *strings, char *delimit, long *N);
 double determineMachineEpsilon();

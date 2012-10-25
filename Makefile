@@ -1,5 +1,5 @@
 CC      = mpicc	
-CFLAGS  = -I$(HOME)/local/include -use-asm  
+CFLAGS  = -I$(HOME)/local/include -use-asm
 LDFLAGS = -L$(HOME)/local/lib -lm -lmpi -lgsl -lgslcblas #-lfftw3 
 EXEC    = swot
 SRC     = main.c

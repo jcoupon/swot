@@ -58,7 +58,15 @@ ellipticities are smeared out. One should play around with the value of OATH to
 see its influence on the results. As a guideline, OATH = 0.05 (about 3 degrees)
 can be used."
 
-* default input format for gal-gal lensing
+* default input format for "auto" and "cross" [-proj como/phys] [-weighted]
+RA DEC [z] [w]
+change column ids with: -cols1 1,2[,3][,4]
+
+* default input format for "auto_wp" and "cross_wp"
+RA DEC z [w]
+change column ids with: -cols1 1,2,3[,4]
+
+* default input format for "gglens"
 sources (-cols1) RA DEC z sigz
 change column ids with: -cols1 1,2,3,4
 sources (-cols2) RA DEC z sigz e1 e2 weight

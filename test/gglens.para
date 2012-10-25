@@ -6,7 +6,6 @@ data1          test/lenses.cat  #input data catalogue #1
 cols1          1,2,3,4	  	#Column ids for data1
 data2           test/sources.cat	#input random catalogue #1
 cols2       1,2,3,4,5,6,7	#Column ids for ran1
-coord          RADEC	  	#Coordinates: RADEC (in deg) or CART
 #----------------------------------------------------------#
 #Correlation options                                       #
 #----------------------------------------------------------#
