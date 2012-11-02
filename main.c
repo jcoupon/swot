@@ -36,7 +36,7 @@
  *
  * Version history
  * 
- * v 0.2 Oct 21st [Jean]
+ * v 0.2 - 0.21 Oct 21st [Jean]
  * - w(R) implemented: -proj phys/como
  * - wp(rp) can be computed as function 
  *   of physical coordinates -proj phys
@@ -223,11 +223,11 @@ void autoCorr(Config para){
 	for(j=0;j<para.nbins;j++) sum += DD.NN[i + para.nbins*j];
       }
       if(para.log){
-	R[i]     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
-	meanR[i] = exp(DD.meanR[i]/sum);
+	R[i] = meanR[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	if(sum > 0.0) meanR[i] = exp(DD.meanR[i]/sum);
       }else{
-	R[i]     = para.min+para.Delta*(double)i+para.Delta/2.0;
-	meanR[i] = DD.meanR[i]/sum;
+	R[i] = meanR[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
+	if(sum > 0.0) meanR[i] = DD.meanR[i]/sum;
       }
     }
     
@@ -299,22 +299,23 @@ void autoCorr(Config para){
     /* write file out ------------------------------------------------------------------------ */
     fileOut = fopen(para.fileOutName, "w");    
     switch(para.estimator){
-    case LS:  fprintf(fileOut, "#Auto-correlation, Landy & Szalay estimator.\n"); break;
-    case NAT: fprintf(fileOut, "#Auto-correlation, Natural estimator.\n");        break;
-    case HAM: fprintf(fileOut, "#Auto-correlation, Hamilton estimator.\n");       break;
+    case LS:  fprintf(fileOut, "# Auto-correlation, Landy & Szalay estimator.\n"); break;
+    case NAT: fprintf(fileOut, "# Auto-correlation, Natural estimator.\n");        break;
+    case HAM: fprintf(fileOut, "# Auto-correlation, Hamilton estimator.\n");       break;
     }
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "#Resampling: jackknife (%d samples)\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "#Resampling: bootstrap (%d samples)\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples).\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples).\n", para.nsamples); break;
     }
     switch(para.corr){
+      /* If auto correlation  ------------------------------------------------------------------------ */
     case AUTO:
       if(para.proj == COMO){
-	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)        <R>              DD               DR            RR         Ndata      Nrandom\n");
+	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }else if(para.proj == PHYS){
-	fprintf(fileOut, "#  R(physical)  w            err(total) err(resampling) err(poisson)        <R>              DD               DR            RR         Ndata      Nrandom\n");
+	fprintf(fileOut, "#  R(physical)  w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }else{
-	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)        <R>              DD               DR            RR         Ndata      Nrandom\n");
+	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }
       for(i=0;i<para.nbins;i++){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
@@ -323,10 +324,16 @@ void autoCorr(Config para){
 		DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
       }
       break;
+      /* If wp(rp) auto correlation  ------------------------------------------------------------------------ */
     case AUTO_WP: 
-      fprintf(fileOut, "#Attention: sum(...) are the integrated sums of pairs along pi,\n");
-      fprintf(fileOut, "#given for reference ONLY. No combination of these would lead to wp.\n");
-      fprintf(fileOut, "#  rp         wp           err(total) err(resampling) err(poisson) 	    <R>              sum(DD)          sum(DR)       sum(RR)    Ndata      Nrandom\n");
+      fprintf(fileOut, "# pi upper limit integration: %5.2f Mpc.\n", para.pi_max);
+      fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
+      fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
+      if(para.proj == COMO){
+	fprintf(fileOut, "# rp (comoving) wp         err(total) err(resampling) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
+      }else if(para.proj == PHYS){
+	fprintf(fileOut, "# rp (physical) wp         err(total) err(resampling) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
+      }
       for(i=0;i<para.nbins;i++){
 	RR_sum = 0;
 	DR_sum = 0;
@@ -351,7 +358,7 @@ void autoCorr(Config para){
     if(para.corr == AUTO_WP && para.xi){
       sprintf(fileOutName, "%s.xi", para.fileOutName);
       fileOut = fopen(fileOutName,"w");
-      fprintf(fileOut, "#Rows: rp, columns: pi\n#"); 
+      fprintf(fileOut, "# Rows: rp, columns: pi\n#"); 
       for(i=0;i<para.nbins;i++) fprintf(fileOut, "%12.7f ", R[i]);
       fprintf(fileOut, "\n"); 
       for(i=0;i<para.nbins;i++){
@@ -513,11 +520,11 @@ void crossCorr(Config para){
 	for(j=0;j<para.nbins;j++) sum += D1D2.NN[i + para.nbins*j];
       }
       if(para.log){
-	R[i]     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
-	meanR[i] = exp(D1D2.meanR[i]/sum);
+	R[i] = meanR[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	if(sum > 0.0) meanR[i] = exp(D1D2.meanR[i]/sum);
       }else{
-	R[i]     = para.min+para.Delta*(double)i+para.Delta/2.0;
-	meanR[i] = D1D2.meanR[i]/sum;
+	R[i] = meanR[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
+	if(sum > 0.0) meanR[i] = D1D2.meanR[i]/sum;
       }
     }
     
@@ -588,17 +595,18 @@ void crossCorr(Config para){
     
     /* write file out ------------------------------------------------------------------------ */
     fileOut = fopen(para.fileOutName,"w");
-    if(swapped) fprintf(fileOut, "#ATTENTION: \"1\" and \"2\" have been swapped to save memory.\n");
+    if(swapped) fprintf(fileOut, "# ATTENTION: \"1\" and \"2\" have been swapped to save memory.\n");
     switch(para.estimator){
-    case LS:  fprintf(fileOut, "#Cross-correlation. Landy & Szalay estimator\n"); break;
-    case NAT: fprintf(fileOut, "#Cross-correlation. Natural estimator\n");        break;
-    case HAM: fprintf(fileOut, "#Cross-correlation. Hamilton estimator\n");       break;
+    case LS:  fprintf(fileOut, "# Cross-correlation. Landy & Szalay estimator\n"); break;
+    case NAT: fprintf(fileOut, "# Cross-correlation. Natural estimator\n");        break;
+    case HAM: fprintf(fileOut, "# Cross-correlation. Hamilton estimator\n");       break;
     }
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "#Resampling: jackknife (%d samples)\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "#Resampling: bootstrap (%d samples)\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples)\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples)\n", para.nsamples); break;
     }
     switch(para.corr){
+      /* If cross correlation  ------------------------------------------------------------------------ */
     case CROSS:   
       if(para.proj == COMO){
 	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
@@ -615,13 +623,15 @@ void crossCorr(Config para){
 		D1D2.NN[i], D1R1.NN[i], D2R2.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
       }
       break;
+      /* If wp(rp) cross correlation  ------------------------------------------------------------------------ */
     case CROSS_WP:
-      fprintf(fileOut, "#Attention: sum(...) are the integrated sums of pairs along pi,\n");
-      fprintf(fileOut, "#given for reference ONLY. No combination of these would lead to wp.\n");
+      fprintf(fileOut, "# pi upper limit integration: %5.2f Mpc.\n", para.pi_max);
+      fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
+      fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
       if(para.proj == COMO){
-	fprintf(fileOut, "#  rp(comoving) wp           err(total) err(resampling) err(poisson)               <rp>             sum(D1D2)        sum(D1R1)       sum(D2R2)     sum(R1R2)  Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+	fprintf(fileOut, "#  rp(comoving) wp           err(total) err(resampling) err(poisson)     <rp>         sum(D1D2)         sum(D1R1)         sum(D2R2)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
       }else if(para.proj == PHYS){
-	fprintf(fileOut, "#  rp(physical) wp           err(total) err(resampling) err(poisson)               <rp>             sum(D1D2)        sum(D1R1)       sum(D2R2)     sum(R1R2)  Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+	fprintf(fileOut, "#  rp(physical) wp           err(total) err(resampling) err(poisson)     <rp>         sum(D1D2)         sum(D1R1)         sum(D2R2)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
       }
      
       for(i=0;i<para.nbins;i++){
@@ -640,7 +650,7 @@ void crossCorr(Config para){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wp(para, para.estimator, D1D2, R1R2, D1R1, D2R2, -1, i, 0),
 		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
-		D1D2_sum, D1R1_sum, D2R2_sum, R1R2_sum,  D1D2_sum,  R1R2_sum,  D1D2.N2[0],  R1R2.N2[0]);
+		D1D2_sum, D1R1_sum, D2R2_sum, R1R2_sum,  D1D2.N1[0], R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
       }
       break;
     }
@@ -650,11 +660,13 @@ void crossCorr(Config para){
     if(para.corr == CROSS_WP && para.xi){
       sprintf(fileOutName, "%s.xi", para.fileOutName);
       fileOut = fopen(fileOutName,"w");
-      fprintf(fileOut, "#Rows: rp, columns: pi\n#"); 
+      fprintf(fileOut, "# Rows: rp, columns: pi\n#"); 
       for(i=0;i<para.nbins;i++) fprintf(fileOut, "%12.7f ", R[i]);
       fprintf(fileOut, "\n"); 
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
+	  /* DEBUGGING */
+	  //fprintf(fileOut, "%12.7f ", R1R2.NN[j + para.nbins*(i + para.nbins*0)]);
 	  fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R1, D2R2, j, i, 0));
 	}
 	fprintf(fileOut, "\n");
@@ -748,8 +760,8 @@ void ggCorr(Config para){
   lensTree   = buildTree(&para, &lens,   &mask, dimStart, FIRSTCALL);   freePoint(para, lens);
   
   comment(para, "done.\n");
-  
-  comment(para, "Correlating lenses with sources...       "); result = gg(&para, &lensTree, ROOT, &sourceTree, ROOT, FIRSTCALL);
+  comment(para, "Correlating lenses with sources...       ");
+  result = gg(&para, &lensTree, ROOT, &sourceTree, ROOT, FIRSTCALL);
   
   freeMask(para, mask);
   freeTree(para, sourceTree);
@@ -784,23 +796,23 @@ void ggCorr(Config para){
     
     double R, meanR;
     fileOut = fopen(para.fileOutName,"w");
-    fprintf(fileOut, "#Gal-gal lensing. Sigma(R) vs R, linear approximation\n");
+    fprintf(fileOut, "# Gal-gal lensing. Sigma(R) vs R, linear approximation\n");
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "#Resampling: jackknife (%d samples)\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "#Resampling: bootstrap (%d samples)\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples)\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples)\n", para.nsamples); break;
     }
     switch(para.proj){
-    case PHYS:  fprintf(fileOut, "#Coordinates: physical\n"); break;
-    case COMO:  fprintf(fileOut, "#Coordinates: comoving\n"); break;
+    case PHYS:  fprintf(fileOut, "# Coordinates: physical\n"); break;
+    case COMO:  fprintf(fileOut, "# Coordinates: comoving\n"); break;
     }
-    fprintf(fileOut, "#Cosmolgy: H0 = %g, Omega_M = %g, Omega_L = %g\n", para.a[0], para.a[1], para.a[2]);
+    fprintf(fileOut, "# Cosmolgy: H0 = %g, Omega_M = %g, Omega_L = %g\n", para.a[0], para.a[1], para.a[2]);
     fprintf(fileOut, "#  R(Mpc)  SigR(Msun/pc^2) err(weights) err(resampling) Nsources       <R>          e2\n");
     for(i=0;i<para.nbins;i++){
       /* reminder: non-resampled value are stored from i=0 to nbins - 1 in result.w and result.GG */
       
       /* R and Rmean (weighted) */
       if(para.log){ 
-	R     = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+	R     = meanR =exp(para.min+para.Delta*(double)i+para.Delta/2.0);
 	meanR = exp(result.meanR[i]/result.w[i]);
       }else{
 	R     = para.min+para.Delta*(double)i+para.Delta/2.0;
@@ -817,7 +829,7 @@ void ggCorr(Config para){
 		result.e2[i]/result.w[i]);
       }else{
 	fprintf(fileOut,"%12.7f %12.7f %12.7f %12.7f %15zd %12.7f %12.7f\n", 
-		R, 0.0,	0.0, 0.0, (long)result.Nsources[i], 0.0, 0.0);
+		R, 0.0,	0.0, 0.0, (long)result.Nsources[i], R, 0.0);
       }
     }
     
@@ -2057,7 +2069,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.2\n\n	\
+                (Super W Of Theta) MPI version 0.21\n\n	\
 Program to compute two-point correlation functions.\n	\
 Usage:  %s -c configFile [options]: run the program\n	\
         %s -d: display a default configuration file\n\
