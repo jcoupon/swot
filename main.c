@@ -33,8 +33,12 @@
  *
  * Known bugs:
  * - when resampling, some objects fall outside the excluded zone
+ * - the mean <R> is R for auto_wp (why?)
  *
  * Version history
+ * 
+ * v 0.22 Nov 13 [Jean]
+ * - Peebles estimator implemented (DD/DR, D1D2/D1R1)
  * 
  * v 0.2 - 0.21 Oct 21st [Jean]
  * - w(R) implemented: -proj phys/como
@@ -62,6 +66,7 @@
  *   recent versions of Mac OS Xcode and icc 11.1
  *   if using icc, it must be compiled with -use-asm
  *   see http://stackoverflow.com/questions/11877044
+ *
  * v 0.12 May 1st [Jean]
  * - xi(r) 3D added (option -coord CART3D)
  * - default parameter file (swot -d) improved
@@ -299,9 +304,10 @@ void autoCorr(Config para){
     /* write file out ------------------------------------------------------------------------ */
     fileOut = fopen(para.fileOutName, "w");    
     switch(para.estimator){
-    case LS:  fprintf(fileOut, "# Auto-correlation, Landy & Szalay estimator.\n"); break;
-    case NAT: fprintf(fileOut, "# Auto-correlation, Natural estimator.\n");        break;
-    case HAM: fprintf(fileOut, "# Auto-correlation, Hamilton estimator.\n");       break;
+    case LS:      fprintf(fileOut, "# Auto-correlation, Landy & Szalay estimator.\n"); break;
+    case NAT:     fprintf(fileOut, "# Auto-correlation, Natural estimator.\n");        break;
+    case HAM:     fprintf(fileOut, "# Auto-correlation, Hamilton estimator.\n");       break;
+    case PEEBLES: fprintf(fileOut, "# Auto-correlation, Peebles estimator.\n");       break;
     }
     switch(para.err){
     case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples).\n", para.nsamples); break;
@@ -447,12 +453,14 @@ void crossCorr(Config para){
     if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data2.N);}
     
     /* swap "1" and "2" if "1" is larger (to improve memory management)  */
+    /*
     if(random1.N > random2.N){
       comment(para, "ATTENTION: fileRan1 is larger than fileRan2. Swapping \"1\" and \"2\" to save memory...\n");
       tmp = data1;   data1   = data2;   data2   = tmp;
       tmp = random1; random1 = random2; random2 = tmp;
       swapped = 1;
     }
+    */
   }  
   
   /* resample, build mask from random file 1 */
@@ -597,9 +605,10 @@ void crossCorr(Config para){
     fileOut = fopen(para.fileOutName,"w");
     if(swapped) fprintf(fileOut, "# ATTENTION: \"1\" and \"2\" have been swapped to save memory.\n");
     switch(para.estimator){
-    case LS:  fprintf(fileOut, "# Cross-correlation. Landy & Szalay estimator\n"); break;
-    case NAT: fprintf(fileOut, "# Cross-correlation. Natural estimator\n");        break;
-    case HAM: fprintf(fileOut, "# Cross-correlation. Hamilton estimator\n");       break;
+    case LS:      fprintf(fileOut, "# Cross-correlation. Landy & Szalay estimator\n"); break;
+    case NAT:     fprintf(fileOut, "# Cross-correlation. Natural estimator\n");        break;
+    case HAM:     fprintf(fileOut, "# Cross-correlation. Hamilton estimator\n");       break;
+    case PEEBLES: fprintf(fileOut, "# Cross-correlation, Peebles estimator.\n");       break;
     }
     switch(para.err){
     case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples)\n", para.nsamples); break;
@@ -873,6 +882,7 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
   double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
   double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
   double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+  double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
   
   double result = 0.0;
   
@@ -892,6 +902,9 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
     case HAM: /* Hamilton */
       result = Norm4*D1D2.NN[para.nbins*l+i]*R1R2.NN[para.nbins*l+i]/(D1R1.NN[para.nbins*l+i]*D2R2.NN[para.nbins*l+i]) - 1.0;
       break;
+    case PEEBLES: /* Peebles */
+      result = Norm5*D1D2.NN[para.nbins*l+i]/D1R1.NN[para.nbins*l+i] - 1.0;
+      break;
     }
   }
   
@@ -909,6 +922,7 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
   double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
   double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
   double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+  double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
   
   double result = 0.0, sum = 0.0;
   
@@ -928,6 +942,9 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
 	break;
       case HAM: /* Hamilton */
 	result = Norm4*D1D2.NN[j + para.nbins*(i + para.nbins*l)]*R1R2.NN[j + para.nbins*(i + para.nbins*l)]/(D1R1.NN[j + para.nbins*(i + para.nbins*l)]*D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
+	break;
+      case PEEBLES: /* Peebles */
+	result = Norm5*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/D1R1.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
 	break;
       }
     }
@@ -954,6 +971,9 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
 	  break;
 	case HAM: /* Hamilton */
 	  sum = Norm4*D1D2.NN[j + para.nbins*(i + para.nbins*l)]*R1R2.NN[j + para.nbins*(i + para.nbins*l)]/(D1R1.NN[j + para.nbins*(i + para.nbins*l)]*D2R2.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
+	  break;
+	case PEEBLES: /* Peebles */
+	  sum = Norm5*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/D1R1.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
 	  break;
 	}
       }
@@ -2069,11 +2089,11 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.21\n\n	\
+                (Super W Of Theta) MPI version 0.22\n\n	\
 Program to compute two-point correlation functions.\n	\
 Usage:  %s -c configFile [options]: run the program\n	\
         %s -d: display a default configuration file\n\
-Important: for RA/DEC coordinates, the angle\n			\
+Important: for RA/DEC coordinates, the angle\n\
 in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       }
       exit(EXIT_FAILURE);
@@ -2098,7 +2118,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("#Correlation options                                       #\n");
       printf("#----------------------------------------------------------#\n");
       printf("corr           auto\t # Type of correlation: [auto,cross,gglens,auto_wp,cross_wp]\n");
-      printf("est            ls\t # Estimator [ls,nat,ham]\n");
+      printf("est            ls\t # Estimator [ls,nat,ham,peebles]\n");
       printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
       printf("nbins          %d\t # Number of bins\n", para->nbins);
       printf("log            yes\t # Logarithmic bins [yes,no]\n");
@@ -2250,9 +2270,10 @@ void setPara(char *field, char *arg, Config *para){
     else if(!strcmp(arg,"phys"))  para->proj = PHYS;
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"est")) {
-    if(!strcmp(arg,"ls"))       para->estimator = LS;
-    else if(!strcmp(arg,"nat")) para->estimator = NAT;
-    else if(!strcmp(arg,"ham")) para->estimator = HAM;
+    if(!strcmp(arg,"ls"))           para->estimator = LS;
+    else if(!strcmp(arg,"nat"))     para->estimator = NAT;
+    else if(!strcmp(arg,"ham"))     para->estimator = HAM;
+    else if(!strcmp(arg,"peebles")) para->estimator = PEEBLES;
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"range")){
     checkArg(field,arg,para);

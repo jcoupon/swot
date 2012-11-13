@@ -58,6 +58,7 @@
 #define LS          0
 #define NAT         1
 #define HAM         2
+#define PEEBLES     3
 #define MASTER      0
 #define FIRSTCALL   1
 #define ROOT        0
