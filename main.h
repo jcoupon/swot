@@ -1,6 +1,6 @@
 /*-------------------------------------------------------------------------*
- *main.h for swot (Super W Of Theta)                                       *
- *Jean Coupon, Alexie Leauthaud (2012)                                     *
+ * main.h for swot (Super W Of Theta)                                      *
+ * Jean Coupon, Alexie Leauthaud (2012)                                    *
  *-------------------------------------------------------------------------*/
 
 #include <string.h>
@@ -146,8 +146,10 @@ typedef struct Result
    */
   double *N1, *N2;
   
-  /* number of pairs, size = nbins*(nsamples+1) */
-  double *NN;
+  /* number of pairs, size = nbins*(nsamples+1) or nbins*nbins*(nsamples+1). 
+   * NN_s is for xi(s)
+   */
+  double *NN, *NN_s;
   
   /* for GG lensing, size = (nbins*nsamples+1) */
   double *GG, *w;
@@ -173,11 +175,9 @@ typedef struct Config
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
-    corr,  log, Ninfo, proj, xi, weighted;
+    corr,  log, Ninfo, proj, xi, weighted, calib;
   double deltaz, min, max, Delta, OA, pi_max; 
   
-  //coordType
-
   /* error method JACKKNIFE or BOOTSTRAP */
   int err, nsamples;
   
@@ -211,6 +211,7 @@ void ggCorr(Config para);
 
 double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l);
 double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l);
+double xis(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l);
 Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
 Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
 Result gg(const Config *para,const Tree *lens, const long i, const Tree *source, const long j, int firstCall);

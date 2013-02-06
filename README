@@ -3,7 +3,7 @@
  *Jean Coupon, Alexie Leauthaud (2012)                                     *
  *-------------------------------------------------------------------------*
 
-Aug. 10th, 2012
+Feb. 8th, 2013
 
 Program to compute two-point correlation functions based on 
 "divide and conquer" algorithms, mainly, but not limited to:
@@ -45,6 +45,7 @@ The choice for the estimator can be made among:
 ls: Landy & Szalay (1993) estimator (default)
 nat: Natural estimator: 1+DD/RR
 ham: Hamilton (1993) estimator
+peebles: Peebles (1993) estimator
 
 * Open-angle (OA). From Athena's documentation:
 "If two nodes see each other under angles which are smaller than the open-angle
@@ -60,6 +61,8 @@ can be used."
 
 * default input format for "auto" and "cross" [-proj como/phys] [-weighted]
 RA DEC [z] [w]
+This means -> RA DEC z (if -proj phys), RA DEC w (if -weighted), 
+or  RA DEC z w (if -proj phys -weighted) 
 change column ids with: -cols1 1,2[,3][,4]
 
 * default input format for "auto_wp" and "cross_wp"
@@ -67,10 +70,17 @@ RA DEC z [w]
 change column ids with: -cols1 1,2,3[,4]
 
 * default input format for "gglens"
-sources (-cols1) RA DEC z sigz
+lenses (-cols1) RA DEC z sigz
 change column ids with: -cols1 1,2,3,4
 sources (-cols2) RA DEC z sigz e1 e2 weight
 change column ids with: -cols1 1,2,3,4,5,6,7
+
+* default input format for "gglens" to compute calibration factor (-calib yes)
+lenses (-cols1) RA DEC z sigz
+change column ids with: -cols1 1,2,3,4
+sources (-cols2) RA DEC z sigz calib e2 weight
+change column ids with: -cols1 1,2,3,4,5,6,7
+Where calib = 1+m or c
 
 -------------------------------------------------------------------------
 Compilation

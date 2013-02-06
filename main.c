@@ -1,6 +1,6 @@
 #include "main.h"
 
-/*-------------------------------------------------------------------------*
+/* ------------------------------------------------------------------------- *
  * swot (Super W Of Theta)  mpi version
  * Jean Coupon, Alexie Leauthaud (2012)
  *
@@ -12,11 +12,11 @@
  * Supports auto and cross correlations, and galaxy-galaxy lensing.
  * 
  * TO DO:
+ * - implement xi(s)
  * - make consistent indices for rp and xi
- * - read m and compute 1 + K for the "m" gg correction
  * - update README file
  * - approximation at large scale for 3D and wp based on physical distance
- * - add weight and for w(theta)
+ * - add weight for w(theta)
  * - compute tangential shear
  * - option to take into account the East-West orientation
  * - measure the tangential shear
@@ -34,13 +34,17 @@
  * Known bugs:
  * - when resampling, some objects fall outside the excluded zone
  * - the mean <R> is R for auto_wp (why?)
+ * - errors for w(R) when using weights are zero
  *
  * Version history
  * 
- * v 0.22 Nov 13 [Jean]
+ * v 0.3  Feb 6th 2013 [Jean]
+ * - calibration factors, -calib [yes/no] option added
+ *
+ * v 0.22 Nov 13, 2012 [Jean]
  * - Peebles estimator implemented (DD/DR, D1D2/D1R1)
  * 
- * v 0.2 - 0.21 Oct 21st [Jean]
+ * v 0.2 - 0.21 Oct 21st, 2012 [Jean]
  * - w(R) implemented: -proj phys/como
  * - wp(rp) can be computed as function 
  *   of physical coordinates -proj phys
@@ -50,11 +54,11 @@
  *   auto_3D and cross_3D to be implemented soon
  * - implemented w(theta) and wp(rp) weights
  *
- * v 0.15 Aug 21st [Alexie/Jean]
+ * v 0.15 Aug 21st, 2012 [Alexie/Jean]
  * - bug corrected for sig crit in phys coordinates 
  *   (1+z_lens) factor was missing 
  *
- * v 0.14 Aug 10th [Jean]
+ * v 0.14 Aug 10th, 2012 [Jean]
  * - implemented wp(rp): set -corr auto_wp 
  *   and cross_wp for computing wp(rp)
  * - added -xi yes option to print out xi(rp,pi)
@@ -67,16 +71,16 @@
  *   if using icc, it must be compiled with -use-asm
  *   see http://stackoverflow.com/questions/11877044
  *
- * v 0.12 May 1st [Jean]
+ * v 0.12 May 1st, 2012 [Jean]
  * - xi(r) 3D added (option -coord CART3D)
  * - default parameter file (swot -d) improved
  *
- * v 0.11 April 4th [Jean]
+ * v 0.11 April 4th, 2012 [Jean]
  * - data2 for sources catalogue
  * - more details in swot -d, -o now works
  * - no approx.: -OA no
  *
- * v 0.1 April 3rd [Jean]
+ * v 0.1 April 3rd, 2012 [Jean]
  * - version from the old - memory monster - one.
  *   For previous versions, see main.c in legacy/
  *   option "nboots" has been replaced by "nsamples"
@@ -258,7 +262,10 @@ void autoCorr(Config para){
 	    wmean[i] += wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
 	    break;
 	  case AUTO_WP:
-	    wmean[i] += wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1)/(double)para.nsamples;
+	    /* DEBUGGING */
+	     wmean[i] += wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1)/(double)para.nsamples;
+	     // wmean[i] += xis(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
+
 	    break;
 	  }
 	}
@@ -268,7 +275,9 @@ void autoCorr(Config para){
 	    err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1));
 	    break;
 	  case AUTO_WP:
+	    /* DEBUGGING */
 	    err_r[i] += SQUARE(wmean[i]-wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1));
+	    //err_r[i] += SQUARE(wmean[i]-xis(para, para.estimator, DD, RR, DR, DR, i, l+1));
 	    break;
 	  }
 	}
@@ -325,6 +334,7 @@ void autoCorr(Config para){
       }
       for(i=0;i<para.nbins;i++){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
+
 		R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
 		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
@@ -351,8 +361,11 @@ void autoCorr(Config para){
 	  DD_sum += DD.NN[i + para.nbins*j];
 	  j++;
 	}
+
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
+		/* DEBUGGING */
 		R[i], wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0), 
+		//		R[i], xis(para, para.estimator, DD, RR, DR, DR, i, 0),
 		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		DD_sum, DR_sum, RR_sum,  DD.N1[0],  RR.N1[0]);
       }
@@ -624,7 +637,6 @@ void crossCorr(Config para){
       }else{
 	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)               <theta>          D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
       }
-     
       for(i=0;i<para.nbins;i++){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, 0),
@@ -803,9 +815,9 @@ void ggCorr(Config para){
       }
     }
     
-    double R, meanR;
+    double sign, R, meanR;
     fileOut = fopen(para.fileOutName,"w");
-    fprintf(fileOut, "# Gal-gal lensing. Sigma(R) vs R, linear approximation\n");
+    fprintf(fileOut, "# Gal-gal lensing. Delta_Sigma(R) vs R, linear approximation\n");
     switch(para.err){
     case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples)\n", para.nsamples); break;
     case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples)\n", para.nsamples); break;
@@ -815,7 +827,13 @@ void ggCorr(Config para){
     case COMO:  fprintf(fileOut, "# Coordinates: comoving\n"); break;
     }
     fprintf(fileOut, "# Cosmolgy: H0 = %g, Omega_M = %g, Omega_L = %g\n", para.a[0], para.a[1], para.a[2]);
-    fprintf(fileOut, "#  R(Mpc)  SigR(Msun/pc^2) err(weights) err(resampling) Nsources       <R>          e2\n");
+    if(para.calib){
+      sign = 1.0;
+      fprintf(fileOut, "#  R(Mpc)  calib_factor    err(weights) err(resampling) Nsources       <R>          e2\n");
+    }else{
+      fprintf(fileOut, "#  R(Mpc)  SigR(Msun/pc^2) err(weights) err(resampling) Nsources       <R>          e2\n");
+      sign = -1.0;
+    }
     for(i=0;i<para.nbins;i++){
       /* reminder: non-resampled value are stored from i=0 to nbins - 1 in result.w and result.GG */
       
@@ -831,7 +849,7 @@ void ggCorr(Config para){
       /* don't divide by zero if there are too few objects in the bin */
       if(result.Nsources[i] > 3.0){
 	fprintf(fileOut,"%12.7f %12.7f %12.7f %12.7f %15zd %12.7f %12.7f\n", 
-		R, -result.GG[i]/result.w[i],				\
+		R, sign*result.GG[i]/result.w[i],				\
 		sqrt(1.0/result.w[i]), 	err_r[i],			\
 		(long)result.Nsources[i],				\
 		meanR,							\
@@ -910,6 +928,8 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
   
   return result;
 }
+
+
 
 double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l){
   /* i,j are the bin indexes. i : pi, j : rp.
@@ -990,11 +1010,52 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
   }  
 }
 
+
+double xis(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l){
+  /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
+  
+  /* initialization */
+  double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
+  double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
+  double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+  double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+  double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
+  
+  double result = 0.0;
+  
+  if(D1D2.NN_s[para.nbins*l+i] > 0 
+     && D1R1.NN_s[para.nbins*l+i] > 0 
+     && D2R2.NN_s[para.nbins*l+i] > 0 
+     && R1R2.NN_s[para.nbins*l+i] > 0){
+    switch(estimator){
+    case LS:  /* Landy and Szalay */ 
+      result  =  Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
+      result += -Norm2*D1R1.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
+      result += -Norm3*D2R2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] + 1.0;
+      break;
+    case NAT: /* Natural */
+      result = Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] - 1.0;
+      break;
+    case HAM: /* Hamilton */
+      result = Norm4*D1D2.NN_s[para.nbins*l+i]*R1R2.NN_s[para.nbins*l+i]/(D1R1.NN_s[para.nbins*l+i]*D2R2.NN_s[para.nbins*l+i]) - 1.0;
+      break;
+    case PEEBLES: /* Peebles */
+      result = Norm5*D1D2.NN_s[para.nbins*l+i]/D1R1.NN_s[para.nbins*l+i] - 1.0;
+      break;
+    }
+  }
+  
+  return result;
+}
+
 #define leaf(tree,node) ((tree)->left[(node)] == -1)
 #define node(tree,node) ((tree)->left[(node)] > -1)
 
 #define z_tree1         ((tree1)->point.x[NDIM*(i)+2])
 #define distComo_tree1  ((tree1)->distComo[(i)])
+#define z_tree2         ((tree2)->point.x[NDIM*(i)+2])
+#define distComo_tree2  ((tree2)->distComo[(i)])
+
 
 Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall){ 
   /* returns the number of pairs if tree1 != tree2, and twice 
@@ -1100,16 +1161,20 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
    * in w(theta) estimators is identical (numerical trick).
    */
   
-  long k = 0, m = 0, l;
+  long k = 0, m = 0, p = 0, l;
   static Result result;
   static long count, total;
-  double NN, deltaTheta, rp, pi, d;
+  double NN, deltaTheta, rp, pi, s, d;
   
   if(firstCall){
     count = 0;
     total = tree1->N[i]*tree2->N[j];
     result.NN = (double *)malloc(para->nbins*para->nbins*(para->nsamples+1)*sizeof(double));
-    for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++) result.NN[k] = 0;
+    for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++) result.NN[k] = 0.0;
+    /* for xi(s) */
+    result.NN_s = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
+    for(p = 0; p < para->nbins*(para->nsamples+1); p++) result.NN_s[p] = 0.0;
+    
     result.meanR = (double *)malloc(para->nbins*sizeof(double));
     for(k = 0; k < para->nbins; k++){
       result.meanR[k]    = 0.0;
@@ -1151,15 +1216,18 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     
     pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
     rp = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
+    s  =  sqrt(pi*pi + rp*rp);
     
-    if(para->proj == PHYS){
+    if(para->proj == PHYS){      /* Distances in physical coordinates (Mpc) */
       pi /= 1.0+z_tree1;
-      rp /= 1.0+z_tree1; /* Distances in physical coordinates (Mpc) */
+      rp /= 1.0+z_tree1;
+      s  /= 1.0+z_tree1;
     }
     
     if(para->log){
       pi = log(pi);
       rp = log(rp);
+      s  = log(s);
     }
     
     k = floor((pi - para->min)/para->Delta);
@@ -1173,6 +1241,16 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
       }
       result.meanR[m] += rp*NN;
     }
+
+    p = floor((s  - para->min)/para->Delta);
+    
+    if(0 <= p && p < para->nbins){
+      NN = tree1->N[i]*tree2->N[j];
+      result.NN_s[p] += NN;
+      for(l=0;l<para->nsamples;l++){
+	result.NN_s[p + (para->nbins*(l+1))] += NN*tree1->w[para->nsamples*i + l]*tree2->w[para->nsamples*j + l];
+      }
+    }   
     
     count += tree1->N[i]*tree2->N[j];
     printCount(count, total, 10000, para->verbose);
@@ -1184,6 +1262,9 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++){
       result.NN[k] *= 2;
     }
+    for(p = 0; p < para->nbins*(para->nsamples+1); p++){
+      result.NN_s[p] *= 2;
+    }
     for(k = 0; k < para->nbins; k++){
       result.meanR[k] *= 2;
     }
@@ -1193,6 +1274,8 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
   return result;
 }
 
+#undef z_tree2
+#undef distComo_tree2
 #undef z_tree1       
 #undef distComo_tree1
 
@@ -1265,11 +1348,13 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
 #define w_source         ((source)->point.w[(j)])
 #define distComo_source  ((source)->distComo[(j)])
 
+
+
 void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *source, long j, double deltaTheta, Result result){
   /* See Leauthaud et al. (2010),  2010ApJ...709...97L */
   
   double dA, dR, invScaleFac;
-  long k, zero = 0;
+  long l, k, zero = 0;
   
   /* very quick tests? But might be time consuming, too. The key 
    * is to find the best balance...
@@ -1297,46 +1382,58 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
   if(para->log) dR = log(dR);
   k = floor((dR - para->min)/para->Delta);
   if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens + para->deltaz){
-    /* Point A --------------------------------- */
-    Point A = createPoint(*para, 1);
-    A.x[0]    = RA_source;
-    A.x[1]    = DEC_lens;
-    double AS = distAngPointSpher(para, &A, &zero, &source->point, &j);
-    double AL = distAngPointSpher(para, &A, &zero, &lens->point,   &i);
-    /* to get correct sign for phi_gg ---------- */
-    if(RA_source  > RA_lens)  AL = -AL;
-    if(DEC_source < DEC_lens) AS = -AS;
-    double phi_gg     = atan2(AS,AL);
-    double cos2phi_gg = cos(2.0*phi_gg);
-    double sin2phi_gg = sin(2.0*phi_gg);
-    double e1         =  e1_source*cos2phi_gg + e2_source*sin2phi_gg;
-    double e2         = -e1_source*sin2phi_gg + e2_source*cos2phi_gg;
+     
     double DOS        = distComo_source;                  /*  this is angular diameter distance       */
     double DOL        = distComo_lens;                    /*  but (1+z_source) factors cancel out     */
     double DLS        = distComo_source - distComo_lens;  /* Approx. Omega_k = 0                      */
     double SigCritInv = DOL*DLS/DOS/1000.0/(1.0 + z_lens);/* 1/SigCrit in Gpc                         */
-    SigCritInv       /= 1.663e3;                          /* see Narayan & Bartelman pge 10           */
+    SigCritInv       /= 1.663e3;                          /* see Narayan & Bartelmann pge 10           */
     SigCritInv       *= invScaleFac*invScaleFac;          /* If coordinates in comoving system        */
+   
+    /* lensing weight */
+    double GG, w   = SigCritInv*SigCritInv*w_source;
     
-    /* ATTENTION: source->w and lens->w are resampling weights (boostrap or jackknife) whereas
-     * w below (and further result.w) is the lensing weight (i.e. shape measurement error 
-     * if inverse variance estimate) 
-     */
-    double w   = SigCritInv*SigCritInv*w_source;
-    double GG  = e1*w/SigCritInv;
+    if(para->calib){ /* Compute calibration factor (1+m or c) */
+      GG = e1_source*w/SigCritInv;
+      result.w[k]  += w/SigCritInv;
+    }else{
+      /* Point A --------------------------------- */
+      Point A = createPoint(*para, 1);
+      A.x[0]    = RA_source;
+      A.x[1]    = DEC_lens;
+      double AS = distAngPointSpher(para, &A, &zero, &source->point, &j);
+      double AL = distAngPointSpher(para, &A, &zero, &lens->point,   &i);
+      /* to get correct sign for phi_gg ---------- */
+      if(RA_source  > RA_lens)  AL = -AL;
+      if(DEC_source < DEC_lens) AS = -AS;
+      double phi_gg     = atan2(AS, AL);
+      double cos2phi_gg = cos(2.0*phi_gg);
+      double sin2phi_gg = sin(2.0*phi_gg);
+      double e1         =  e1_source*cos2phi_gg + e2_source*sin2phi_gg;
+      double e2         = -e1_source*sin2phi_gg + e2_source*cos2phi_gg;
+      
+      GG  = e1*w/SigCritInv;
+      
+      result.w[k]  += w;
+      result.e2[k] += e2*w/SigCritInv;
+      freePoint(*para, A);
+    }
     
-    long l;
+    /* lensing signal */
     result.GG[k] += GG;
-    result.w[k]  += w;
+    
+    /* bootstraps */
     for(l=0;l<para->nsamples;l++){
+      /* ATTENTION: source->w and lens->w are resampling weights (boostrap or jackknife) whereas
+       * w below (and further result.w) is the lensing weight (i.e. shape measurement error 
+       * if inverse variance estimate) 
+       */
       result.GG[para->nbins*(l+1) + k] += GG*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
       result.w[para->nbins*(l+1) + k]  +=  w*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
     }    
     /* keep track of info per bin */
     result.Nsources[k] += 1.0;
     result.meanR[k]    += dR*w;
-    result.e2[k]       += e2*w/SigCritInv;
-    freePoint(*para, A);
   }
 }
 
@@ -1934,7 +2031,7 @@ void comResult(const Config para, Result result, long Ncpu, int split){
       MPI_Send(result.N1,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
       MPI_Send(result.N2,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
       MPI_Send(result.meanR, para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
-
+      MPI_Send(result.NN_s,  para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
       break;
     }
   }else{
@@ -1991,12 +2088,15 @@ void comResult(const Config para, Result result, long Ncpu, int split){
 	slave.N1 = (double *)malloc((para.nsamples+1)*sizeof(double)); 
 	slave.N2 = (double *)malloc((para.nsamples+1)*sizeof(double)); 
 	slave.meanR = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+	slave.NN_s = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
 	for(rank=1;rank<Ncpu;rank++){
 	  MPI_Recv(slave.NN,    para.nbins*para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
 	  MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
 	  MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
 	  MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
+	  MPI_Recv(slave.NN_s,  para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD, &status);
 	  for(i=0;i<para.nbins*para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
+	  for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN_s[i] += slave.NN_s[i];
 	  for(i=0;i<para.nbins;i++){
 	    result.meanR[i] += slave.meanR[i];
 	  }
@@ -2067,6 +2167,7 @@ void initPara(int argc, char **argv, Config *para){
   para->pi_max    = 40.0;
   para->weighted  = 0;
   strcpy(para->fileOutName,   "corr.out");
+  para->calib     = 0;
   
   /* only master talks */
   if(para->rank == MASTER){
@@ -2089,9 +2190,9 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.22\n\n	\
-Program to compute two-point correlation functions.\n	\
-Usage:  %s -c configFile [options]: run the program\n	\
+                (Super W Of Theta) MPI version 0.3\n\n\
+Program to compute two-point correlation functions.\n\
+Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
 Important: for RA/DEC coordinates, the angle\n\
 in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
@@ -2125,6 +2226,8 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("err            jackknife # Resampling method [bootstrap,jackknife]\n");
       printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
+      printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
+      printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
       printf("#----------------------------------------------------------#\n");
       printf("#Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))  #\n");
       printf("#----------------------------------------------------------#\n");
@@ -2302,6 +2405,10 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"H0")){
     checkArg(field,arg,para);
     para->a[0]   = atof(arg);
+  }else if(!strcmp(field,"calib")){
+    checkArg(field,arg,para);
+    if(!strcmp(arg,"yes")) para->calib = 1;
+    else para->calib = 0;
   }else if(!strcmp(field,"Omega_M")){
     checkArg(field,arg,para);
     para->a[1]   = atof(arg);
