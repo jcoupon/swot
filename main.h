@@ -54,6 +54,7 @@
 #define GGLENS      4
 #define AUTO_3D     5
 #define CROSS_3D    6
+#define NUMBER      7
 
 #define LS          0
 #define NAT         1
@@ -175,7 +176,7 @@ typedef struct Config
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
-    corr,  log, Ninfo, proj, xi, weighted, calib;
+    corr,  log, Ninfo, proj, xi, weighted, calib, rot45;
   double deltaz, min, max, Delta, OA, pi_max; 
   
   /* error method JACKKNIFE or BOOTSTRAP */
@@ -205,6 +206,7 @@ typedef struct Config
  *Main routines                                                   *
  *----------------------------------------------------------------*/
 
+void numberCount(Config para);
 void autoCorr(Config para);
 void crossCorr(Config para);
 void ggCorr(Config para);
@@ -212,6 +214,8 @@ void ggCorr(Config para);
 double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l);
 double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l);
 double xis(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int l);
+
+Result Nobjects(const Config *para, const Tree *tree1, const long i, int firstCall);
 Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
 Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
 Result gg(const Config *para,const Tree *lens, const long i, const Tree *source, const long j, int firstCall);
