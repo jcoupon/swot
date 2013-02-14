@@ -12,6 +12,9 @@
  * Supports auto and cross correlations, and galaxy-galaxy lensing.
  * 
  * TO DO:
+ * - remove -rot45 option, replace e1 (e2) by e2 (e1), instead
+ * - check calibration factor (simply replace e by 1+m ?)
+ * - fix error issue and <R> issue for wp weighted !!! 
  * - implement xi(s)
  * - make consistent indices for rp and xi
  * - update README file
@@ -1627,12 +1630,12 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
     SigCritInv       *= invScaleFac*invScaleFac;          /* If coordinates in comoving system        */
    
     /* lensing weight */
-    double GG, w   = SigCritInv*SigCritInv*w_source;
+    double WW, GG, w   = SigCritInv*SigCritInv*w_source;
     
     if(para->calib){ /* Compute calibration factor (1+m or c) */
       
       GG = e1_source*w/SigCritInv;
-      result.w[k]  += w/SigCritInv;
+      WW = w/SigCritInv;
       
     }else{           /* Compute gg lensing signal */
       
@@ -1659,14 +1662,15 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
       double e2         = -e1_source*sin2phi_gg + e2_source*cos2phi_gg;
       
       GG  = e1*w/SigCritInv;
+      WW = w;
       
-      result.w[k]  += w;
       result.e2[k] += e2*w/SigCritInv;
       
     }
     
     /* signal */
     result.GG[k] += GG;
+    result.w[k]  += WW;
     
     /* bootstraps */
     for(l=0;l<para->nsamples;l++){
@@ -1675,12 +1679,12 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
        * if inverse variance estimate) 
        */
       result.GG[para->nbins*(l+1) + k] += GG*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
-      result.w[para->nbins*(l+1) + k]  +=  w*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
+      result.w[para->nbins*(l+1) + k]  += WW*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
     }
     
     /* keep track of info per bin */
     result.Nsources[k] += 1.0;
-    result.meanR[k]    += dR*w;
+    result.meanR[k]    += dR*WW;
   }
 }
 
