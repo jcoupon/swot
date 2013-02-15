@@ -40,7 +40,9 @@
  * - errors for w(R) when using weights are zero
  *
  * Version history
- * 
+ * v 0.32 Feb 15th 2013 [Jean]
+ * - bug corrected in the list of options
+ *
  * v 0.31  Feb 7th 2013 [Jean]
  * - calibration factors, -calib [yes/no] option added
  * - "-corr number" option added to compute 1-pt quantities
@@ -123,7 +125,7 @@ int main(argc,argv)
   switch (para.corr){
   case AUTO: case AUTO_WP:
     /* two-point autocorrelation function */
-    numberCount(para);
+    autoCorr(para);
     break;
   case CROSS: case CROSS_WP:
     /* two-point cross-correlation function */
@@ -2445,7 +2447,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.31\n\n\
+                (Super W Of Theta) MPI version 0.32\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
