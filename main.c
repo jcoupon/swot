@@ -40,6 +40,13 @@
  * - errors for w(R) when using weights are zero
  *
  * Version history
+ * v 0.35 "-" error put back
+ * - "-" error put back, but need to find a solution
+ * v 0.34
+ * - no "-" error
+ * v 0.33 March 5th 2013 [Jean]
+ * - added the options (-err) jackknife2D and bootstrap2D 
+ *
  * v 0.32 Feb 15th 2013 [Jean]
  * - bug corrected in the list of options
  *
@@ -154,7 +161,6 @@ int main(argc,argv)
 /*----------------------------------------------------------------*
  *Main routines                                                   *
  *----------------------------------------------------------------*/
-
 
 void numberCount(Config para){
   /* Computes the number of objects
@@ -275,7 +281,7 @@ void numberCount(Config para){
     }
     fclose(fileOut);
    
-      /* write file out covariance matrix -------------------------------------------------------------- */
+    /* write file out covariance matrix -------------------------------------------------------------- */
     if(para.cov_mat){ 
       double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
       sprintf(fileOutName, "%s.cov", para.fileOutName);
@@ -377,7 +383,7 @@ void autoCorr(Config para){
     comment(para, "DD(rp,pi)...       "); DD = Npairs3D(&para, &dataTree,   ROOT, &dataTree,   nodeSlaveData, FIRSTCALL);
     break;
   }
-
+  
   freeMask(para, mask);
   freeTree(para, randomTree);
   freeTree(para, dataTree);
@@ -503,7 +509,6 @@ void autoCorr(Config para){
       }
       for(i=0;i<para.nbins;i++){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
-
 		R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
 		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
@@ -1383,7 +1388,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
   }
   
   if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n", 100.0); 
-  
+    
   if(firstCall && tree1 == tree2){
     for(k = 0; k < para->nbins*(para->nsamples+1); k++){
       result.NN[k] *= 2;
@@ -1624,11 +1629,11 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
   k = floor((dR - para->min)/para->Delta);
   if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens + para->deltaz){
      
-    double DOS        = distComo_source;                  /*  this is angular diameter distance       */
+    double DOS        = distComo_source;                  /*  this is (tranverse) comoving distance   */
     double DOL        = distComo_lens;                    /*  but (1+z_source) factors cancel out     */
     double DLS        = distComo_source - distComo_lens;  /* Approx. Omega_k = 0                      */
-    double SigCritInv = DOL*DLS/DOS/1000.0/(1.0 + z_lens);/* 1/SigCrit in Gpc                         */
-    SigCritInv       /= 1.663e3;                          /* see Narayan & Bartelmann pge 10           */
+    double SigCritInv = DOL*DLS/DOS/1000.0/(1.0 + z_lens);/* 1/SigCrit in Gpc (1+z) to convert to dA  */
+    SigCritInv       /= 1.663e3;                          /* see Narayan & Bartelmann pge 10          */
     SigCritInv       *= invScaleFac*invScaleFac;          /* If coordinates in comoving system        */
    
     /* lensing weight */
@@ -1778,13 +1783,17 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   result.N[local_index] = (double)data->N*result.point.w[local_index];
 
   /* set weights from mask */
+  int ndim;
+  if(para->resample2D) ndim = 2;
+  else ndim = NDIM; 
   for(j=0;j<para->nsamples;j++){  /* loop over subsamples */
     n = 0;
-    for(i=0;i<NDIM;i++){
-      n += (mask->min[NDIM*j + i] < result.point.x[NDIM*local_index + i] && 
-	    result.point.x[NDIM*local_index + i] < mask->max[NDIM*j + i] );
+    for(i=0;i<ndim;i++){
+      n += (mask->min[ndim*j + i] < result.point.x[NDIM*local_index + i] && 
+	    result.point.x[NDIM*local_index + i] < mask->max[ndim*j + i] );
     }
-    if(n == NDIM){  /* "result.point" is in the subsample "j" */
+
+    if(n == ndim){  /* "result.point" is in the subsample "j" */
       for(i=0;i<para->nsamples;i++){  /* loop over resamplings  */
 	result.w[para->nsamples*local_index + i] = mask->w[para->nsamples*i+j];
       }
@@ -1877,6 +1886,10 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
   static long depth, depthSample, count;
   long i, j, l, rank;
 
+  int ndim;
+  if(para->resample2D) ndim = 2;
+  else ndim = NDIM;
+
   if(firstCall){
     
     depthSample = 0;
@@ -1899,8 +1912,8 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
     }
     
     /* initialisation */
-    mask->min = (double *)malloc(NDIM*para->nsamples*sizeof(double));  
-    mask->max = (double *)malloc(NDIM*para->nsamples*sizeof(double));  
+    mask->min = (double *)malloc(ndim*para->nsamples*sizeof(double));  
+    mask->max = (double *)malloc(ndim*para->nsamples*sizeof(double));  
     mask->w   = (char *)malloc(para->nsamples*para->nsamples*sizeof(char));
     
     if(para->rank == MASTER){
@@ -1924,8 +1937,6 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
 	  }
 	}
       }
-      
-      
     }
   }
   
@@ -1941,7 +1952,7 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
       splitData(*para, *data, dim, &dataLeft, &dataRight);
       
       /* next splitting coordinate */
-      dim++; if(dim > NDIM-1) dim = 0;
+      dim++; if(dim > ndim-1) dim = 0;
       
       resample(para, &dataLeft,  dim, mask, 0);
       resample(para, &dataRight, dim, mask, 0);
@@ -1949,17 +1960,16 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
     }else{
       
       /* compute limits of the mask */
-      for(dim=0;dim<NDIM;dim++){
-    	mask->min[NDIM*count + dim] = data->x[NDIM*0+dim];
-    	mask->max[NDIM*count + dim] = data->x[NDIM*0+dim];
+      for(dim=0;dim<ndim;dim++){
+    	mask->min[ndim*count + dim] = data->x[ndim*0+dim];
+    	mask->max[ndim*count + dim] = data->x[ndim*0+dim];
       }
       for(i=1;i<data->N;i++){
-    	for(dim=0;dim<NDIM;dim++){
-    	  mask->min[NDIM*count + dim] = MIN(mask->min[NDIM*count + dim], data->x[NDIM*i+dim]);
-    	  mask->max[NDIM*count + dim] = MAX(mask->max[NDIM*count + dim], data->x[NDIM*i+dim]);
-    	}
+    	for(dim=0;dim<ndim;dim++){
+    	  mask->min[ndim*count + dim] = MIN(mask->min[ndim*count + dim], data->x[ndim*i+dim]);
+    	  mask->max[ndim*count + dim] = MAX(mask->max[ndim*count + dim], data->x[ndim*i+dim]);
+	}
       }
-      
       count++;
     }
     
@@ -1968,8 +1978,8 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
   }
   
   if(firstCall){
-    MPI_Bcast(mask->min, NDIM*para->nsamples, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
-    MPI_Bcast(mask->max, NDIM*para->nsamples, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+    MPI_Bcast(mask->min, ndim*para->nsamples, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+    MPI_Bcast(mask->max, ndim*para->nsamples, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
     MPI_Bcast(mask->w,   para->nsamples*para->nsamples, MPI_CHAR, MASTER, MPI_COMM_WORLD);
   }
   
@@ -2422,9 +2432,9 @@ void initPara(int argc, char **argv, Config *para){
   para->pi_max    = 40.0;
   para->weighted  = 0;
   strcpy(para->fileOutName,   "corr.out");
-  para->calib     = 0;
-  para->rot45     = 0;
-
+  para->calib      = 0;
+  para->rot45      = 0;
+  para->resample2D = 0;
   
   /* only master talks */
   if(para->rank == MASTER){
@@ -2447,7 +2457,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.32\n\n\
+                (Super W Of Theta) MPI version 0.35\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2458,10 +2468,10 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
     }
     /* dump a default configuration file ---------------------------- */
     if(!strcmp(argv[i],"-d")){
-      printf("#Configuration file for %s\n",MYNAME);
-      printf("#----------------------------------------------------------#\n");
-      printf("#Input catalogues                                          #\n");
-      printf("#----------------------------------------------------------#\n");
+      printf("# Configuration file for %s\n",MYNAME);
+      printf("# ---------------------------------------------------------- #\n");
+      printf("# Input catalogues                                           #\n");
+      printf("# ---------------------------------------------------------- #\n");
       printf("data1          %s  # input data catalogue #1\n",    para->fileInName1);
       printf("cols1          %d,%d\t  # Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
       printf("data2          %s  # input data catalogue #2\n",    para->fileInName2);
@@ -2472,31 +2482,31 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("rancols2       %d,%d\t  # Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
       //   printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
       //printf("                    \t  #in degrees if RADEC\n");
-      printf("#----------------------------------------------------------#\n");
-      printf("#Correlation options                                       #\n");
-      printf("#----------------------------------------------------------#\n");
+      printf("# ---------------------------------------------------------- #\n");
+      printf("# Correlation options                                        #\n");
+      printf("# ---------------------------------------------------------- #\n");
       printf("corr           auto\t # Type of correlation: [auto,cross,gglens,auto_wp,cross_wp,number]\n");
       printf("est            ls\t # Estimator [ls,nat,ham,peebles]\n");
       printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
       printf("nbins          %d\t # Number of bins\n", para->nbins);
       printf("log            yes\t # Logarithmic bins [yes,no]\n");
       printf("err            jackknife # Resampling method [bootstrap,jackknife]\n");
+      printf("                         # or [bootstrap2D,jackknife2D]\n");
       printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
-      printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
       printf("rot45          no\t # Rotate e_t by 45 degrees\n");
-      printf("#----------------------------------------------------------#\n");
-      printf("#Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))  #\n");
-      printf("#----------------------------------------------------------#\n");
+      printf("# ---------------------------------------------------------- #\n");
+      printf("# Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))   #\n");
+      printf("# ---------------------------------------------------------- #\n");
       printf("H0             %g\t # Hubble parameter\n", para->a[0]);
       printf("Omega_M        %g\t # Relative matter density\n", para->a[1]);
       printf("Omega_L        %g\t # Relative energy density (Lambda)\n", para->a[2]);
       printf("deltaz         %g\t # For gg lensing: Zsource > Zlens + deltaz\n", para->deltaz);
       printf("pi_max         %g\t # For wp: limit for pi integration\n", para->pi_max);
-      printf("#----------------------------------------------------------#\n");
-      printf("#Output options                                            #\n");
-      printf("#----------------------------------------------------------#\n");
+      printf("# ---------------------------------------------------------- #\n");
+      printf("# Output options                                             #\n");
+      printf("# ---------------------------------------------------------- #\n");
       printf("proj           theta\t # Axis projection [theta, como, phys:\n");
       printf("                    \t # auto, cross: default: theta (deg)\n");
       printf("                    \t # auto_wp, cross_wp, gglens: default: como (Mpc)\n");
@@ -2656,7 +2666,13 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     if(!strcmp(arg,"jackknife"))      para->err = JACKKNIFE;
     else if(!strcmp(arg,"bootstrap")) para->err = BOOTSTRAP;
-    else checkArg(field, NULL, para);
+    else if(!strcmp(arg,"bootstrap2D")){
+      para->err = BOOTSTRAP;
+      para->resample2D = 1;
+    } else if(!strcmp(arg,"jackknife2D")){
+      para->err = JACKKNIFE;
+      para->resample2D = 1;
+    } else checkArg(field, NULL, para);
   }else if(!strcmp(field,"nsamples")){
     checkArg(field,arg,para);
     para->nsamples = atoi(arg);
@@ -2714,6 +2730,8 @@ void setPara(char *field, char *arg, Config *para){
 void checkArg(char *field, char *arg, Config *para){
   /* Checks if the option has a valid argument. */
   if(arg == NULL || *arg == '-'){
+    //if(arg == NULL){
+    
     if(para->verbose) fprintf(stderr,"%s: **ERROR** option %s has no valid argument. Exiting...\n", MYNAME, field);
     MPI_Finalize();
     exit(EXIT_FAILURE);

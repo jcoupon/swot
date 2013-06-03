@@ -176,7 +176,7 @@ typedef struct Config
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
-    corr,  log, Ninfo, proj, xi, weighted, calib, rot45;
+    corr,  log, Ninfo, proj, xi, weighted, calib, rot45,  resample2D;
   double deltaz, min, max, Delta, OA, pi_max; 
   
   /* error method JACKKNIFE or BOOTSTRAP */
