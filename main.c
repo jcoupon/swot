@@ -12,14 +12,11 @@
  * Supports auto and cross correlations, and galaxy-galaxy lensing.
  * 
  * TO DO:
- * - remove -rot45 option, replace e1 (e2) by e2 (e1), instead
  * - check calibration factor (simply replace e by 1+m ?)
- * - fix error issue and <R> issue for wp weighted !!! 
  * - implement xi(s)
  * - make consistent indices for rp and xi
  * - update README file
  * - approximation at large scale for 3D and wp based on physical distance
- * - add weight for w(theta)
  * - compute tangential shear
  * - option to take into account the East-West orientation
  * - measure the tangential shear
@@ -40,8 +37,16 @@
  * - errors for w(R) when using weights are zero
  *
  * Version history
- * v 0.35 "-" error put back
- * - "-" error put back, but need to find a solution
+ *
+ * v 0.36 
+ * - bug corrected for bootstrap2D and jackknife2D 
+ * - removed checkArg for "range"
+ * - fixed bug for covariance matrix
+ * - removed -rot45 option and fixed bug for e2
+ * now e2 IS the e1 rotated by 45 deg
+
+ * v 0.35
+ * - "-" error put back, but need to find a solution [see v 0.36]
  * v 0.34
  * - no "-" error
  * v 0.33 March 5th 2013 [Jean]
@@ -199,10 +204,16 @@ void numberCount(Config para){
   /* grow trees */
   comment(para, "building trees...");
   dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
-  comment(para, "done.\n");
+  comment(para, "done.\n");  
+  
+  /* DEBUGGING
+     if(para.rank == MASTER){
+     printTree(para, "tree.out", dataTree, ROOT, 1, FIRSTCALL);
+     }
+  */
   
   /* divide and conquer */
-  long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
+  long nodeSlaveData = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
   
   /* compute number of objects */
   comment(para, "N...       "); N = Nobjects(&para, &dataTree, nodeSlaveData, FIRSTCALL);
@@ -286,9 +297,9 @@ void numberCount(Config para){
       double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
       sprintf(fileOutName, "%s.cov", para.fileOutName);
       fileOut = fopen(fileOutName, "w");
+      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
-	  cov[i] = 0.0;
 	  for(l=0;l<para.nsamples;l++){
 	    cov[para.nbins*i+j] += norm*(Nmean[i]-N.NN[para.nbins*(l+1)+i])
 	      *(Nmean[j]-N.NN[para.nbins*(l+1)+j]);
@@ -314,7 +325,6 @@ void numberCount(Config para){
   
   return;
 }
-
 
 void autoCorr(Config para){
   /* Computes the auto correlation function.
@@ -566,11 +576,11 @@ void autoCorr(Config para){
     /* write file out covariance matrix -------------------------------------------------------------- */
     if(para.cov_mat){ 
       double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
       sprintf(fileOutName, "%s.cov", para.fileOutName);
       fileOut = fopen(fileOutName, "w");
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
-	  cov[i] = 0.0;
 	  switch(para.corr){
 	  case AUTO:   
 	    for(l=0;l<para.nsamples;l++){
@@ -872,11 +882,11 @@ void crossCorr(Config para){
     /* write file out covariance matrix -------------------------------------------------------------- */
     if(para.cov_mat){ 
       double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
       sprintf(fileOutName, "%s.cov", para.fileOutName);
       fileOut = fopen(fileOutName, "w");
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
-	  cov[i] = 0.0;
 	  switch(para.corr){
 	  case CROSS:   
 	    for(l=0;l<para.nsamples;l++){
@@ -1027,7 +1037,7 @@ void ggCorr(Config para){
 		sqrt(1.0/result.w[i]), 	err_r[i],			\
 		(long)result.Nsources[i],				\
 		meanR,							\
-		result.e2[i]/result.w[i]);
+		sign*result.e2[i]/result.w[i]);
       }else{
 	fprintf(fileOut,"%12.7f %12.7f %12.7f %12.7f %15zd %12.7f %12.7f\n", 
 		R, 0.0,	0.0, 0.0, (long)result.Nsources[i], R, 0.0);
@@ -1234,7 +1244,7 @@ Result Nobjects(const Config *para, const Tree *tree1, const long i, int firstCa
   long k = 0, l;
   static Result result;
   static long count, total;
-  double NN;
+  double w, NN;
   
   if(firstCall){
     
@@ -1264,27 +1274,29 @@ Result Nobjects(const Config *para, const Tree *tree1, const long i, int firstCa
     
   }else{
     
-    NN = tree1->N[i];
+    NN = tree1->point.x[NDIM*i+2];
     if(para->log) NN = log(NN);
     
     k = floor((NN - para->min)/para->Delta);
     if(0 <= k && k < para->nbins){
-      result.NN[k] += 1.0;
+      if(para->weighted) w = tree1->point.w[i];
+      else w = 1.0;
+      
+      result.NN[k] +=  1.0*w;
       for(l=0;l<para->nsamples;l++){
-
-	double weight =  tree1->w[para->nsamples*i + l];
 	
 	/* DEBUGGING - tot get the error for subsamples 
+	   double weight =  tree1->w[para->nsamples*i + l];
 	   if(weight == 0){
 	   weight = 1;
 	   }else{
 	   weight = 0;
 	   }
-	*/
-	
-	result.NN[para->nbins*(l+1) + k] += weight;
+	   result.NN[para->nbins*(l+1) + k] += weight;
+      	*/
+	result.NN[para->nbins*(l+1) + k] += tree1->w[para->nsamples*i + l]*w;
       }
-      result.meanR[k] += NN;
+      result.meanR[k] += NN*w;
     }
     count += tree1->N[i];
     printCount(count, total, 1000, para->verbose);
@@ -1599,7 +1611,7 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
 void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *source, long j, double deltaTheta, Result result){
   /* See Leauthaud et al. (2010),  2010ApJ...709...97L */
   
-  double dA, dR, invScaleFac, rot45 = 0.0;
+  double dA, dR, invScaleFac;
   long l, k, zero = 0;
   
   /* very quick tests? But might be time consuming, too. The key 
@@ -1658,11 +1670,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
       if(RA_source  > RA_lens)  AL = -AL;
       if(DEC_source < DEC_lens) AS = -AS;
       
-      /* Systematics tests: 45 * PI/180.0*/
-      if(para->rot45) rot45 =  0.7853982;
-
-      // DEBUGGING
-      double phi_gg     = atan2(AS, AL) + rot45;
+      double phi_gg     = atan2(AS, AL);
       double cos2phi_gg = cos(2.0*phi_gg);
       double sin2phi_gg = sin(2.0*phi_gg);
       double e1         =  e1_source*cos2phi_gg + e2_source*sin2phi_gg;
@@ -1823,7 +1831,6 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
    */
 
   /* test if deleting the Cart coordinates will slow down or not */
-
   
   dMax = 0.0; maxPoint = 0;
   for(n=0;n<data->N;n++){
@@ -1961,13 +1968,13 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
       
       /* compute limits of the mask */
       for(dim=0;dim<ndim;dim++){
-    	mask->min[ndim*count + dim] = data->x[ndim*0+dim];
-    	mask->max[ndim*count + dim] = data->x[ndim*0+dim];
+    	mask->min[ndim*count + dim] = data->x[NDIM*0+dim];
+    	mask->max[ndim*count + dim] = data->x[NDIM*0+dim];
       }
       for(i=1;i<data->N;i++){
     	for(dim=0;dim<ndim;dim++){
-    	  mask->min[ndim*count + dim] = MIN(mask->min[ndim*count + dim], data->x[ndim*i+dim]);
-    	  mask->max[ndim*count + dim] = MAX(mask->max[ndim*count + dim], data->x[ndim*i+dim]);
+    	  mask->min[ndim*count + dim] = MIN(mask->min[ndim*count + dim], data->x[NDIM*i+dim]);
+    	  mask->max[ndim*count + dim] = MAX(mask->max[ndim*count + dim], data->x[NDIM*i+dim]);
 	}
       }
       count++;
@@ -2375,9 +2382,9 @@ void comResult(const Config para, Result result, long Ncpu, int split){
 }
 #undef BASE
 
-/*----------------------------------------------------------------*
- *Configuration                                                   *
- *----------------------------------------------------------------*/
+/* ---------------------------------------------------------------- *
+ * Configuration                                                    *
+ * ---------------------------------------------------------------- */
 
 void initPara(int argc, char **argv, Config *para){
   /* Reads the input parameters given in the configuration 
@@ -2433,7 +2440,6 @@ void initPara(int argc, char **argv, Config *para){
   para->weighted  = 0;
   strcpy(para->fileOutName,   "corr.out");
   para->calib      = 0;
-  para->rot45      = 0;
   para->resample2D = 0;
   
   /* only master talks */
@@ -2457,7 +2463,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.35\n\n\
+                (Super W Of Theta) MPI version 0.36\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2495,7 +2501,6 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
-      printf("rot45          no\t # Rotate e_t by 45 degrees\n");
       printf("# ---------------------------------------------------------- #\n");
       printf("# Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))   #\n");
       printf("# ---------------------------------------------------------- #\n");
@@ -2554,9 +2559,12 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   /* Adjust number of dimensions */
   if(para->proj == COMO || para->proj == PHYS) NDIM  = 3;
   
-  /* For number, read catalogues as they were w(theta) weighted format: RA DEC w */
-  if(para->corr == NUMBER) para->weighted  = 1;
- 
+  /* For number, only bootsrap in 2D */
+  if(para->corr == NUMBER){ 
+    NDIM  = 3;
+    para->resample2D = 1;
+  }
+  
   //To do implement: cart 3D
   //para->distAng = &dist3D;
   
@@ -2651,7 +2659,7 @@ void setPara(char *field, char *arg, Config *para){
     else if(!strcmp(arg,"peebles")) para->estimator = PEEBLES;
     else checkArg(field, NULL, para);
   }else if(!strcmp(field,"range")){
-    checkArg(field,arg,para);
+    // checkArg(field,arg,para);
     getStrings(arg,list,",",&Ncol);
     para->min = getDoubleValue(list,1);
     para->max = getDoubleValue(list,2);
@@ -2687,10 +2695,6 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     if(!strcmp(arg,"yes")) para->calib = 1;
     else para->calib = 0;
-  }else if(!strcmp(field,"rot45")){
-    checkArg(field,arg,para);
-    if(!strcmp(arg,"yes")) para->rot45 = 1;
-    else para->rot45 = 0;
   }else if(!strcmp(field,"Omega_M")){
     checkArg(field,arg,para);
     para->a[1]   = atof(arg);
@@ -2719,9 +2723,11 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"c")){
     /* do nothing, this is the option for the config file */
   }else{
+    /*
     if(para->verbose) fprintf(stderr,"%s: **ERROR** %s is not a valid option. Exiting...\n", MYNAME, field);
     MPI_Finalize();
     exit(EXIT_FAILURE);
+    */
   }
   
   return;
@@ -3020,7 +3026,7 @@ Point createPoint(const Config para, long N){
   point.dim = -1;  
   
   point.x = (double *)malloc(N*NDIM*sizeof(double));
-  point.w    = (double *)malloc(N*sizeof(double));
+  point.w = (double *)malloc(N*sizeof(double));
   if(para.corr == GGLENS){
     point.zerr = (double *)malloc(N*sizeof(double));
     point.e1   = (double *)malloc(N*sizeof(double));

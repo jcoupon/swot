@@ -59,14 +59,18 @@ ellipticities are smeared out. One should play around with the value of OATH to
 see its influence on the results. As a guideline, OATH = 0.05 (about 3 degrees)
 can be used."
 
+* default input format for "number" [-weighted]
+RA DEC X [weight]
+change column ids with: -cols1 1,2,3[,4]
+
 * default input format for "auto" and "cross" [-proj como/phys] [-weighted]
-RA DEC [z] [w]
+RA DEC [z] [weight]
 This means -> RA DEC z (if -proj phys), RA DEC w (if -weighted), 
 or  RA DEC z w (if -proj phys -weighted) 
 change column ids with: -cols1 1,2[,3][,4]
 
 * default input format for "auto_wp" and "cross_wp"
-RA DEC z [w]
+RA DEC z [weight]
 change column ids with: -cols1 1,2,3[,4]
 
 * default input format for "gglens"

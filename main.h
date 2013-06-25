@@ -38,11 +38,6 @@
 #define SUCCESS     1
 #define ODD         0
 #define EVEN        1
-/*
-#define RADEC       0
-#define CART        1
-#define CART3D      2
-*/
 #define COMO        0
 #define THETA       1
 #define PHYS        2
@@ -85,7 +80,6 @@ typedef struct Point
 {
   /* number of points */
   long N;
-  //  double Nweighted;
 
   /* dimension along which they are sorted 
      (ascending order). -1 if not.  */
@@ -176,7 +170,7 @@ typedef struct Config
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
-    corr,  log, Ninfo, proj, xi, weighted, calib, rot45,  resample2D;
+    corr,  log, Ninfo, proj, xi, weighted, calib,  resample2D;
   double deltaz, min, max, Delta, OA, pi_max; 
   
   /* error method JACKKNIFE or BOOTSTRAP */
