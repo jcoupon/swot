@@ -38,13 +38,18 @@
  *
  * Version history
  *
+ * v 0.37
+ * - Alexie changed the print output for g-g lensing
+ *  from if(result.Nsources[i] > 3.0){ to 
+ *  if(result.Nsources[i] > 0.0){
+ *
  * v 0.36 
  * - bug corrected for bootstrap2D and jackknife2D 
  * - removed checkArg for "range"
  * - fixed bug for covariance matrix
  * - removed -rot45 option and fixed bug for e2
  * now e2 IS the e1 rotated by 45 deg
-
+ *
  * v 0.35
  * - "-" error put back, but need to find a solution [see v 0.36]
  * v 0.34
@@ -1031,7 +1036,7 @@ void ggCorr(Config para){
       }
       
       /* don't divide by zero if there are too few objects in the bin */
-      if(result.Nsources[i] > 3.0){
+      if(result.Nsources[i] > 0.0){
 	fprintf(fileOut,"%12.7f %12.7f %12.7f %12.7f %15zd %12.7f %12.7f\n", 
 		R, sign*result.GG[i]/result.w[i],				\
 		sqrt(1.0/result.w[i]), 	err_r[i],			\
@@ -2463,7 +2468,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.36\n\n\
+                (Super W Of Theta) MPI version 0.37\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
