@@ -38,6 +38,10 @@
  *
  * Version history
  *
+ * v 0.38 [Jean]
+ * - added options (-corr) auto_3D and cross_3D
+ * for 3D correlation functions
+
  * v 0.37
  * - Alexie changed the print output for g-g lensing
  *  from if(result.Nsources[i] > 3.0){ to 
@@ -140,11 +144,11 @@ int main(argc,argv)
   double t0 = MPI_Wtime();
   
   switch (para.corr){
-  case AUTO: case AUTO_WP:
+  case AUTO: case AUTO_WP: case AUTO_3D: 
     /* two-point autocorrelation function */
     autoCorr(para);
     break;
-  case CROSS: case CROSS_WP:
+  case CROSS: case CROSS_WP: case CROSS_3D:
     /* two-point cross-correlation function */
     crossCorr(para);
     break;
@@ -387,7 +391,7 @@ void autoCorr(Config para){
   
   /* compute pairs */
   switch (para.corr){
-  case AUTO:
+  case AUTO: case AUTO_3D:
     comment(para, "RR...       "); RR = Npairs(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
     comment(para, "DR...       "); DR = Npairs(&para, &dataTree,   ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
     comment(para, "DD...       "); DD = Npairs(&para, &dataTree,   ROOT, &dataTree,   nodeSlaveData, FIRSTCALL);
@@ -415,7 +419,7 @@ void autoCorr(Config para){
     double *R          = (double *)malloc(para.nbins*sizeof(double));
     double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
     for(i=0;i<para.nbins;i++){
-      if(para.corr == AUTO) sum = DD.NN[i];
+      if(para.corr == AUTO || para.corr == AUTO_3D ) sum = DD.NN[i];
       if(para.corr == AUTO_WP) {
 	sum = 0.0;
 	for(j=0;j<para.nbins;j++) sum += DD.NN[i + para.nbins*j];
@@ -449,7 +453,7 @@ void autoCorr(Config para){
       if(para.nsamples > 1){ /* mean */
 	for(l=0;l<para.nsamples;l++){
 	  switch (para.corr){
-	  case AUTO:
+	  case AUTO: case AUTO_3D: 
 	    wmean[i] += wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
 	    break;
 	  case AUTO_WP:
@@ -461,7 +465,7 @@ void autoCorr(Config para){
 	}
 	for(l=0;l<para.nsamples;l++){ /* dispersion */
 	  switch (para.corr){
-	  case AUTO:	  
+	  case AUTO: case AUTO_3D:	  
 	    err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1));
 	    break;
 	  case AUTO_WP:
@@ -475,7 +479,7 @@ void autoCorr(Config para){
       }
       /* 2. poisson error ~1/N */
       switch (para.corr){
-      case AUTO:
+      case AUTO:  case AUTO_3D:
 	if(DD.NN[para.nbins*0+i] > 0 && RR.NN[para.nbins*0+i] > 0){
 	  err_p[i] = ABS(1.0+wTheta(para, para.estimator, DD, RR, DR, DR, i, 0))*(1.0/sqrt((double)DD.NN[para.nbins*0+i]) + 1.0/sqrt((double)RR.NN[para.nbins*0+i]));
 	}else{
@@ -514,7 +518,7 @@ void autoCorr(Config para){
     }
     switch(para.corr){
       /* If auto correlation  ------------------------------------------------------------------------ */
-    case AUTO:
+    case AUTO:  case AUTO_3D:
       if(para.proj == COMO){
 	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }else if(para.proj == PHYS){
@@ -587,7 +591,7 @@ void autoCorr(Config para){
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
 	  switch(para.corr){
-	  case AUTO:   
+	  case AUTO:  case AUTO_3D:   
 	    for(l=0;l<para.nsamples;l++){
 	      cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1))
 		*(wmean[j]-wTheta(para, para.estimator, DD, RR, DR, DR, j, l+1));
@@ -691,7 +695,7 @@ void crossCorr(Config para){
   
   /* compute pairs */
   switch (para.corr){
-  case CROSS:
+  case CROSS: case CROSS_3D: 
     comment(para, "R1R2...       "); R1R2 = Npairs(&para, &randomTree1, ROOT, &randomTree2, ROOT,  FIRSTCALL);
     comment(para, "D1R1...       "); D1R1 = Npairs(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
     comment(para, "D2R2...       "); D2R2 = Npairs(&para, &dataTree2,   ROOT, &randomTree2, ROOT,  FIRSTCALL);
@@ -724,7 +728,7 @@ void crossCorr(Config para){
     double *R          = (double *)malloc(para.nbins*sizeof(double));
     double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
     for(i=0;i<para.nbins;i++){
-      if(para.corr == AUTO) sum = (double)D1D2.NN[i];
+      if(para.corr == AUTO || para.corr == AUTO_3D) sum = (double)D1D2.NN[i];
       if(para.corr == AUTO_WP) {
 	sum = 0.0;
 	for(j=0;j<para.nbins;j++) sum += D1D2.NN[i + para.nbins*j];
@@ -756,7 +760,7 @@ void crossCorr(Config para){
       if(para.nsamples > 1){
 	for(l=0;l<para.nsamples;l++){ /* mean */
 	  switch (para.corr){
-	  case CROSS:
+	  case CROSS: case CROSS_3D:
 	    wmean[i] += wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, l+1)/(double)para.nsamples;
 	    break;
 	  case CROSS_WP:
@@ -766,7 +770,7 @@ void crossCorr(Config para){
 	}
 	for(l=0;l<para.nsamples;l++){ /* dispersion */
 	  switch (para.corr){
-	  case CROSS:
+	  case CROSS: case CROSS_3D:
 	    err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, l+1));
 	    break;
 	  case CROSS_WP:
@@ -778,7 +782,7 @@ void crossCorr(Config para){
       }
       /* 2. poisson error ~1/N */
       switch (para.corr){
-      case CROSS:
+      case CROSS: case CROSS_3D:
 	if(D1D2.NN[para.nbins*0+i] > 0 && R1R2.NN[para.nbins*0+i] > 0){
 	  err_p[i] = ABS(1.0+wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, 0))*(1.0/sqrt((double)D1D2.NN[para.nbins*0+i]) + 1.0/sqrt((double)R1R2.NN[para.nbins*0+i]));
 	}else{
@@ -818,7 +822,7 @@ void crossCorr(Config para){
     }
     switch(para.corr){
       /* If cross correlation  ------------------------------------------------------------------------ */
-    case CROSS:   
+    case CROSS: case CROSS_3D:   
       if(para.proj == COMO){
 	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
       }else if(para.proj == PHYS){
@@ -893,7 +897,7 @@ void crossCorr(Config para){
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
 	  switch(para.corr){
-	  case CROSS:   
+	  case CROSS: case CROSS_3D:   
 	    for(l=0;l<para.nsamples;l++){
 	      cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, l+1))
 		*(wmean[j]-wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, j, l+1));
@@ -1611,8 +1615,6 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
 #define w_source         ((source)->point.w[(j)])
 #define distComo_source  ((source)->distComo[(j)])
 
-
-
 void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *source, long j, double deltaTheta, Result result){
   /* See Leauthaud et al. (2010),  2010ApJ...709...97L */
   
@@ -1729,7 +1731,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
 void freeResult(const Config para, Result result){
   
   switch(para.corr){
-  case AUTO: case CROSS: case AUTO_WP: case CROSS_WP: case NUMBER:
+  case AUTO: case CROSS: case AUTO_3D: case CROSS_3D: case AUTO_WP: case CROSS_WP: case NUMBER:
     free(result.N1);
     free(result.N2);
     free(result.NN);
@@ -2136,21 +2138,8 @@ double distAngSpher(const Tree *a, const long *i, const Tree *b, const long *j){
 }
 
 
-/* this function will be deprecated */
-/* double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j){ */
-/* /\*Returns the angular distance between nodes */
-/*  * a[i] and b[j]. Cartesian coordinates. */
-/*  *\/ */
-  
-/*   double d0 = (b->point.x[NDIM*(*j)+0] - a->point.x[NDIM*(*i)+0]); */
-/*   double d1 = (b->point.x[NDIM*(*j)+1] - a->point.x[NDIM*(*i)+1]); */
-  
-/*   return sqrt(d0*d0 + d1*d1); */
-/* } */
-
-
 double dist3D(const Tree *a, const long *i, const Tree *b, const long *j){
-/*Returns the angular distance between nodes
+/* Returns the distance between nodes
  * a[i] and b[j]. Cartesian coordinates in 3D.
  */
   
@@ -2288,7 +2277,7 @@ void comResult(const Config para, Result result, long Ncpu, int split){
   
   if(para.rank != MASTER){
     switch(para.corr){
-    case AUTO: case CROSS: case NUMBER:
+    case AUTO: case CROSS: case AUTO_3D: case CROSS_3D: case NUMBER:
       MPI_Send(result.NN, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
       MPI_Send(result.N1, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
       MPI_Send(result.N2, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
@@ -2315,7 +2304,7 @@ void comResult(const Config para, Result result, long Ncpu, int split){
     MPI_Status status;
       
       switch(para.corr){
-      case AUTO: case CROSS:  case NUMBER:
+      case AUTO: case CROSS: case AUTO_3D: case CROSS_3D:  case NUMBER:
 	slave.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(long));
 	slave.N1    = (double *)malloc((para.nsamples+1)*sizeof(double)); 
 	slave.N2    = (double *)malloc((para.nsamples+1)*sizeof(double)); 
@@ -2426,7 +2415,6 @@ void initPara(int argc, char **argv, Config *para){
     para->ran2Id[i]  = i+1;
   }
   NDIM            = 2; /* number of dimensions, 2 or 3 */
-  //para->coordType = RADEC;
   para->distAng   = &distAngSpher;
   para->proj      = THETA;
   para->corr      = AUTO;
@@ -2468,7 +2456,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.37\n\n\
+                (Super W Of Theta) MPI version 0.38\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2496,7 +2484,8 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("# ---------------------------------------------------------- #\n");
       printf("# Correlation options                                        #\n");
       printf("# ---------------------------------------------------------- #\n");
-      printf("corr           auto\t # Type of correlation: [auto,cross,gglens,auto_wp,cross_wp,number]\n");
+      printf("corr           auto\t # Type of correlation:\n");
+      printf("                   \t # [auto,cross,gglens,auto_wp,cross_wp,auto_3D,cross_3D,number]\n");
       printf("est            ls\t # Estimator [ls,nat,ham,peebles]\n");
       printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
       printf("nbins          %d\t # Number of bins\n", para->nbins);
@@ -2562,7 +2551,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
     para->proj = COMO; 
   }
   /* Adjust number of dimensions */
-  if(para->proj == COMO || para->proj == PHYS) NDIM  = 3;
+  if(para->proj == COMO || para->proj == PHYS || para->corr == AUTO_3D || para->corr == CROSS_3D) NDIM  = 3;
   
   /* For number, only bootsrap in 2D */
   if(para->corr == NUMBER){ 
@@ -2570,8 +2559,10 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
     para->resample2D = 1;
   }
   
-  //To do implement: cart 3D
-  //para->distAng = &dist3D;
+  /* For 3D cartesian coordinates, angular separation replaced by 3D distance */
+  if(para->corr == AUTO_3D || para->corr == CROSS_3D){
+    para->distAng   = &dist3D;
+  }
   
   if(para->log){
     if(para->min < EPS){
@@ -2647,6 +2638,8 @@ void setPara(char *field, char *arg, Config *para){
     if(!strcmp(arg,"cross"))         para->corr = CROSS;
     else if(!strcmp(arg,"auto"))     para->corr = AUTO;
     else if(!strcmp(arg,"gglens"))   para->corr = GGLENS;
+    else if(!strcmp(arg,"auto_3D"))  para->corr = AUTO_3D;
+    else if(!strcmp(arg,"cross_3D")) para->corr = CROSS_3D;
     else if(!strcmp(arg,"auto_wp"))  para->corr = AUTO_WP;
     else if(!strcmp(arg,"cross_wp")) para->corr = CROSS_WP;
     else if(!strcmp(arg,"number"))   para->corr = NUMBER;

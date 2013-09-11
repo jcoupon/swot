@@ -69,6 +69,12 @@ This means -> RA DEC z (if -proj phys), RA DEC w (if -weighted),
 or  RA DEC z w (if -proj phys -weighted) 
 change column ids with: -cols1 1,2[,3][,4]
 
+* default input format for "auto_3D" and "cross_3D" [-weighted]
+X Y Z [weight]
+change column ids with: -cols1 1,2,3[,4]
+Trick: for 2D cartesian correlations, simply fix the 3rd column
+to a constant number
+
 * default input format for "auto_wp" and "cross_wp"
 RA DEC z [weight]
 change column ids with: -cols1 1,2,3[,4]
