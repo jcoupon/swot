@@ -38,6 +38,9 @@
  *
  * Version history
  *
+ * v 0.39 [Jean]
+ * - corrected a bug for wp(r)
+ *
  * v 0.38 [Jean]
  * - added options (-corr) auto_3D and cross_3D
  * for 3D correlation functions
@@ -380,11 +383,10 @@ void autoCorr(Config para){
   long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
   long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
 
+
   /* DEBUGGING
-  if(para.verbose){
-    para.rank = 0;
-    nodeSlaveData  = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
-    printTree(para, para.fileOutName, randomTree, nodeSlaveData, 1, FIRSTCALL);
+  if(para.rank == MASTER){
+    printTree(para, para.fileOutName, dataTree, ROOT, 1, FIRSTCALL);
     exit(-1);
   }
   */
@@ -1458,13 +1460,12 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
   }
   
   if(tree1 == tree2 && i > j) return result;
-  
-  deltaTheta = para->distAng(tree1, &i, tree2, &j);
 
-  // d          = sqrt(pi*pi + rp*rp);
+  deltaTheta = para->distAng(tree1, &i, tree2, &j);
+  // for wp(r) testing
+  //deltaTheta = dist3D(tree1, &i, tree2, &j);
   
-  /* DEBUGGING */
-  d          = deltaTheta;
+  d = deltaTheta;
   
   if(node(tree1, i) && tree1->r[i]/d > para->OA){
     if(node(tree2, j) && tree2->r[j]/d > para->OA){
@@ -1480,9 +1481,17 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     Npairs3D(para, tree1, i, tree2, tree2->left[j],   0); 
     Npairs3D(para, tree1, i, tree2,  tree2->right[j], 0); 
   }else{
-    
+
     pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
     rp = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
+    
+    // for wp(r) testing
+    //double delx = (tree1->point.x[NDIM*(i)+0] - tree2->point.x[NDIM*(j)+0]);
+    //double dely = (tree1->point.x[NDIM*(i)+1] - tree2->point.x[NDIM*(j)+1]);
+    //double delz = (tree1->point.x[NDIM*(i)+2] - tree2->point.x[NDIM*(j)+2]);
+    //rp = sqrt((delx*delx)+(dely*dely));
+    //pi = ABS(delz);
+    
     s  =  sqrt(pi*pi + rp*rp);
     
     if(para->proj == PHYS){      /* Distances in physical coordinates (Mpc) */
@@ -2023,10 +2032,10 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
   }else{
     for(dim=0;dim<NDIM;dim++)   fprintf(fileOut,"%f ", tree.point.x[NDIM*i+dim]);
     for(l=0;l<para.nsamples;l++)  fprintf(fileOut,"%d ", tree.w[para.nsamples*i + l] );
-    fprintf(fileOut,"%d \n", para.rank);
+    fprintf(fileOut,"     %d \n", para.rank);
   }
   
-  if(firstCall)  MPI_Barrier(MPI_COMM_WORLD);
+  //if(firstCall)  MPI_Barrier(MPI_COMM_WORLD);
  
 }
 
@@ -2456,7 +2465,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.38\n\n\
+                (Super W Of Theta) MPI version 0.39\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2506,9 +2515,9 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("# ---------------------------------------------------------- #\n");
       printf("# Output options                                             #\n");
       printf("# ---------------------------------------------------------- #\n");
-      printf("proj           theta\t # Axis projection [theta, como, phys:\n");
-      printf("                    \t # auto, cross: default: theta (deg)\n");
-      printf("                    \t # auto_wp, cross_wp, gglens: default: como (Mpc)\n");
+      printf("proj           theta\t # Axis projection [theta, como, phys]\n");
+      printf("                    \t # for auto, cross: default: theta (deg)\n");
+      printf("                    \t # for auto_[3d,wp], cross_[3d,wp], gglens: default: como (Mpc)\n");
       printf("out            %s\t # Output file\n", para->fileOutName);
       printf("cov            no\t # Covariance matrix of errors [yes,no] (in \"out\".cov)\n");
       printf("xi             no\t # xi(rp, pi) for auto_wp [yes,no] (in \"out\".xi)\n");
@@ -2553,8 +2562,9 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   /* Adjust number of dimensions */
   if(para->proj == COMO || para->proj == PHYS || para->corr == AUTO_3D || para->corr == CROSS_3D) NDIM  = 3;
   
-  /* For number, only bootsrap in 2D */
-  if(para->corr == NUMBER){ 
+
+  /* For number and wp(rp), set NDIM = 3 and only bootsrap in 2D */
+  if(para->corr == NUMBER || para->corr == AUTO_WP || para->corr == CROSS_WP){ 
     NDIM  = 3;
     para->resample2D = 1;
   }
