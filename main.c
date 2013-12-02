@@ -38,6 +38,9 @@
  *
  * Version history
  *
+ * v 0.40 [Jean]
+ * - now integrates along pi in linear scale
+ * 
  * v 0.39 [Jean]
  * - corrected a bug for wp(r)
  *
@@ -556,11 +559,11 @@ void autoCorr(Config para){
 	  DD_sum += DD.NN[i + para.nbins*j];
 	  j++;
 	}
-
+	
+	/* TEST: xis(para, para.estimator, DD, RR, DR, DR, i, 0),*/
+	
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
-		/* DEBUGGING */
 		R[i], wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0), 
-		//		R[i], xis(para, para.estimator, DD, RR, DR, DR, i, 0),
 		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
 		DD_sum, DR_sum, RR_sum,  DD.N1[0],  RR.N1[0]);
       }
@@ -881,8 +884,6 @@ void crossCorr(Config para){
       fprintf(fileOut, "\n"); 
       for(i=0;i<para.nbins;i++){
 	for(j=0;j<para.nbins;j++){
-	  /* DEBUGGING */
-	  //fprintf(fileOut, "%12.7f ", R1R2.NN[j + para.nbins*(i + para.nbins*0)]);
 	  fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R1, D2R2, j, i, 0));
 	}
 	fprintf(fileOut, "\n");
@@ -1125,7 +1126,6 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
 }
 
 
-
 double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R1, Result D2R2, int i, int j, int l){
   /* i,j are the bin indexes. i : pi, j : rp.
      if i = -1, integrates over i (pi).
@@ -1171,10 +1171,14 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
     result = 0.0;
     while(R < para.pi_max && i < para.nbins){
       sum = 0.0;
-      if( D1D2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
-	  && D1R1.NN[j + para.nbins*(i + para.nbins*l)] > 0 
-	  && D2R2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
-	  && R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
+      //     if( D1D2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
+      //	  && D1R1.NN[j + para.nbins*(i + para.nbins*l)] > 0 
+      //	  && D2R2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
+      //	  && R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
+
+      if( R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0.0){
+
+      //  if(1){
 	switch(estimator){
 	case LS:  /* Landy and Szalay */
 	  sum  =  Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
@@ -1192,13 +1196,9 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
 	  break;
 	}
       }
-      if(para.log){
-	R       = exp(para.min+para.Delta*i+para.Delta/2.0);
-	result += 2.0*sum*R*para.Delta;
-      }else{
-	R       = para.min+para.Delta*i+para.Delta/2.0;
-	result += 2.0*sum*para.Delta;
-      }
+      
+      result += 2.0*sum*para.Delta_pi;
+      
       i++;
     }
     return result;
@@ -1462,9 +1462,10 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
   if(tree1 == tree2 && i > j) return result;
 
   deltaTheta = para->distAng(tree1, &i, tree2, &j);
-  // for wp(r) testing
-  //deltaTheta = dist3D(tree1, &i, tree2, &j);
   
+  // DEBUGGING for wp(r) testing
+  //deltaTheta = distAngCart(tree1, &i, tree2, &j);
+
   d = deltaTheta;
   
   if(node(tree1, i) && tree1->r[i]/d > para->OA){
@@ -1485,7 +1486,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
     rp = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
     
-    // for wp(r) testing
+    // DEBUGGING for wp(r) testing
     //double delx = (tree1->point.x[NDIM*(i)+0] - tree2->point.x[NDIM*(j)+0]);
     //double dely = (tree1->point.x[NDIM*(i)+1] - tree2->point.x[NDIM*(j)+1]);
     //double delz = (tree1->point.x[NDIM*(i)+2] - tree2->point.x[NDIM*(j)+2]);
@@ -1501,12 +1502,13 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     }
     
     if(para->log){
-      pi = log(pi);
       rp = log(rp);
       s  = log(s);
-    }
+    }    
     
-    k = floor((pi - para->min)/para->Delta);
+    /* pi in linear scale */
+    k = floor((pi - 0.0)/para->Delta_pi);
+    
     m = floor((rp - para->min)/para->Delta);
     
     if(0 <= k && k < para->nbins && 0 <= m && m < para->nbins){
@@ -1862,7 +1864,10 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   }else{
     result.r[local_index] = d;
   }
-    
+
+   // DEBUGGING for wp(rp) testing
+  // result.r[local_index] = d;
+  
   /* if wp, use physical distance THIS DOES NOT SEEM TO WORK PROPERLY ???*/
   if(para->corr == AUTO_WP || para->corr == CROSS_WP ){
     //result.r[local_index]  = result.distComo[local_index]*result.r[local_index]*PI/180.0;
@@ -2110,9 +2115,21 @@ long countNodes(long N, long NLeaf){
   return result + 1;
 }
 
+
+double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j){
+/* Returns the distance between nodes
+ * a[i] and b[j]. Cartesian coordinates in 2D.
+ */
+  
+  double d0 = (b->point.x[NDIM*(*j)+0] - a->point.x[NDIM*(*i)+0]);
+  double d1 = (b->point.x[NDIM*(*j)+1] - a->point.x[NDIM*(*i)+1]);
+   
+  return sqrt(d0*d0 + d1*d1);
+}
+
 double distAngPointCart(const Config *para, const Point *a, const long *i, const Point *b, const long *j){
   /* returns the angular distance between points 
-   * a[i] and b[i]. Cartesian coordinates.
+   * a[i] and b[i]. Cartesian coordinates in 2D.
    */
   
   double d0 = (b->x[NDIM*(*j)+0] - a->x[NDIM*(*i)+0]);
@@ -2465,7 +2482,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.39\n\n\
+                (Super W Of Theta) MPI version 0.40\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2574,6 +2591,10 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
     para->distAng   = &dist3D;
   }
   
+
+  /* wp(rp) integrated along pi in linear scale */
+  para->Delta_pi = (para->max - para->min)/(double)para->nbins;
+
   if(para->log){
     if(para->min < EPS){
       if(para->verbose) fprintf(stderr,"\n%s: **ERROR** logarithmic binning: min range should be > 0. Exiting...\n", MYNAME);
@@ -3091,7 +3112,6 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX], int weighted
       for(dim=0;dim<NDIM;dim++) data.x[NDIM*n+dim] = getDoubleValue(item,id[dim]);
       if(weighted){
 	data.w[n] = getDoubleValue(item,id[NDIM+0]);
-	//DEBUGGING data.w[n] = 0.5;
       }else{
 	data.w[n] = 1.0;
       }

@@ -171,7 +171,7 @@ typedef struct Config
    * Change to PHYS for physical coordinates*/
   int cov_mat, estimator, nbins, 
     corr,  log, Ninfo, proj, xi, weighted, calib,  resample2D;
-  double deltaz, min, max, Delta, OA, pi_max; 
+  double deltaz, min, max, Delta, Delta_pi, OA, pi_max; 
   
   /* error method JACKKNIFE or BOOTSTRAP */
   int err, nsamples;
@@ -229,7 +229,7 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
 long countNodes(long N, long NLeaf);
 double distAngPointCart(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double distAngPointSpher(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
-//double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j);
+double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j);
 double distAngPoint(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double dist3D(const Tree *a, const long *i, const Tree *b, const long *j);
 
