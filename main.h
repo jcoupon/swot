@@ -169,7 +169,7 @@ typedef struct Config
    * Default proj(ection) for gg lensing is
    * comoving (COMO), for auto.cross is theta (THETA).
    * Change to PHYS for physical coordinates*/
-  int cov_mat, estimator, nbins, 
+  int cov_mat, estimator, nbins, nbins_pi,
     corr,  log, Ninfo, proj, xi, weighted, calib,  resample2D;
   double deltaz, min, max, Delta, Delta_pi, OA, pi_max; 
   

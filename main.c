@@ -38,6 +38,9 @@
  *
  * Version history
  *
+ * v 0.41 [Jean]
+ * - fixed a bug concerning pi_max
+ * 
  * v 0.40 [Jean]
  * - now integrates along pi in linear scale
  * 
@@ -1142,11 +1145,13 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
   double result = 0.0, sum = 0.0;
   
   if(i > -1){
-    if( D1D2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
-	&& D1R1.NN[j + para.nbins*(i + para.nbins*l)] > 0 
-	&& D2R2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
-	&& R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
-      switch(estimator){
+    // if( D1D2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
+    //&& D1R1.NN[j + para.nbins*(i + para.nbins*l)] > 0 
+    //&& D2R2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
+    //&& R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
+     
+    if(R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
+    switch(estimator){
       case LS:  /* Landy and Szalay */
 	result  =  Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
 	result += -Norm2*D1R1.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
@@ -1166,19 +1171,20 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
     return result;
   }else{
     /* reset i and integrate over pi (i)*/
-    i      = 0;
-    R      = 0.0;
+    //i      = 0;
+    // R      = 0.0;
     result = 0.0;
-    while(R < para.pi_max && i < para.nbins){
-      sum = 0.0;
+
+    //  while(R < para.pi_max && i < para.nbins){
+    for(i=0; i<para.nbins; i++){
+
+    sum = 0.0;
       //     if( D1D2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
       //	  && D1R1.NN[j + para.nbins*(i + para.nbins*l)] > 0 
       //	  && D2R2.NN[j + para.nbins*(i + para.nbins*l)] > 0 
       //	  && R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
 
       if( R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0.0){
-
-      //  if(1){
 	switch(estimator){
 	case LS:  /* Landy and Szalay */
 	  sum  =  Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
@@ -1199,7 +1205,10 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
       
       result += 2.0*sum*para.Delta_pi;
       
-      i++;
+      //      i++;
+      /* R */
+      // R = 0.0+para.Delta_pi*(double)i;
+
     }
     return result;
   }  
@@ -1486,6 +1495,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
     rp = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
     
+
     // DEBUGGING for wp(r) testing
     //double delx = (tree1->point.x[NDIM*(i)+0] - tree2->point.x[NDIM*(j)+0]);
     //double dely = (tree1->point.x[NDIM*(i)+1] - tree2->point.x[NDIM*(j)+1]);
@@ -1508,7 +1518,6 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
     
     /* pi in linear scale */
     k = floor((pi - 0.0)/para->Delta_pi);
-    
     m = floor((rp - para->min)/para->Delta);
     
     if(0 <= k && k < para->nbins && 0 <= m && m < para->nbins){
@@ -1811,17 +1820,16 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   /* set weights from mask */
   int ndim;
   if(para->resample2D) ndim = 2;
-  else ndim = NDIM; 
+  else ndim = NDIM;
   for(j=0;j<para->nsamples;j++){  /* loop over subsamples */
     n = 0;
     for(i=0;i<ndim;i++){
-      n += (mask->min[ndim*j + i] < result.point.x[NDIM*local_index + i] && 
-	    result.point.x[NDIM*local_index + i] < mask->max[ndim*j + i] );
+      n += (mask->min[ndim*j + i] < result.point.x[NDIM*local_index + i] &&
+ 	    result.point.x[NDIM*local_index + i] < mask->max[ndim*j + i] );
     }
-
     if(n == ndim){  /* "result.point" is in the subsample "j" */
       for(i=0;i<para->nsamples;i++){  /* loop over resamplings  */
-	result.w[para->nsamples*local_index + i] = mask->w[para->nsamples*i+j];
+ 	result.w[para->nsamples*local_index + i] = mask->w[para->nsamples*i+j];
       }
       break;
     }
@@ -2448,6 +2456,7 @@ void initPara(int argc, char **argv, Config *para){
   para->min       = 0.0001;
   para->max       = 1.0;
   para->nbins     = 20;
+  para->nbins_pi  = 100;
   para->log       = 1;
   para->OA        = 0.05;
   para->nsamples  = 32;
@@ -2482,7 +2491,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.40\n\n\
+                (Super W Of Theta) MPI version 0.41\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2593,7 +2602,8 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   
 
   /* wp(rp) integrated along pi in linear scale */
-  para->Delta_pi = (para->max - para->min)/(double)para->nbins;
+  // DEBUGGING para->Delta_pi = (para->max - para->min)/(double)para->nbins;
+  para->Delta_pi = (para->pi_max - 0.0)/(double)para->nbins;
 
   if(para->log){
     if(para->min < EPS){
