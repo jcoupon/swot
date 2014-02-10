@@ -25,7 +25,7 @@
  * 
  * Contributions:
  * - the algorithm to compute the number of pairs from a tree is 
- *   based on, but slightly different to, Martin Kilbinger's Ahtena code:
+ *   based on, but slightly different to, Martin Kilbinger's Athena code:
  *   http://www2.iap.fr/users/kilbinge/athena/
  * - the gal-gal lensing algorithm is based on
  *   Alexie Leauthaud's code 
@@ -38,6 +38,9 @@
  *
  * Version history
  *
+ * v 0.42 [Jean]
+ * - fixed a bug for auto_3D and cross_3D
+ * 
  * v 0.41 [Jean]
  * - fixed a bug concerning pi_max
  * 
@@ -1390,17 +1393,23 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
     Npairs(para, tree1, i, tree2,  tree2->right[j], 0); 
   }else{
     
-    switch(para->proj){
-    case COMO:
-      d  = distComo_tree1*deltaTheta*PI/180.0;              /* Transverse distance in comoving coordinates (Mpc) */
-      break;
-    case PHYS:
-      d  = distComo_tree1*deltaTheta*PI/180.0/(1+z_tree1);  /* Transverse distance in physical coordinates (Mpc) */
-      break;
-    case THETA:
+    
+    if(para->corr != AUTO_3D && para->corr != AUTO_3D){
+      switch(para->proj){
+      case COMO:
+	d  = distComo_tree1*deltaTheta*PI/180.0;              /* Transverse distance in comoving coordinates (Mpc) */
+	break;
+      case PHYS:
+	d  = distComo_tree1*deltaTheta*PI/180.0/(1+z_tree1);  /* Transverse distance in physical coordinates (Mpc) */
+	break;
+      case THETA:
+	d = deltaTheta;
+	break;
+      }
+    }else{
       d = deltaTheta;
-      break;
-    }
+    }	
+      
     
     /* Note: tree->N[i] is the weighted sum of objects so there's no 
      * need to keep track of the sum of the weights, which is simply NN. 
@@ -2491,7 +2500,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.41\n\n\
+                (Super W Of Theta) MPI version 0.42\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2588,7 +2597,6 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   /* Adjust number of dimensions */
   if(para->proj == COMO || para->proj == PHYS || para->corr == AUTO_3D || para->corr == CROSS_3D) NDIM  = 3;
   
-
   /* For number and wp(rp), set NDIM = 3 and only bootsrap in 2D */
   if(para->corr == NUMBER || para->corr == AUTO_WP || para->corr == CROSS_WP){ 
     NDIM  = 3;
