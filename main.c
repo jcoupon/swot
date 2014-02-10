@@ -38,6 +38,10 @@
  *
  * Version history
  *
+ * v 0.43 [Jean]
+ * - sampling for gg lensing is done wrt to the
+ * source 2D distribution
+ * 
  * v 0.42 [Jean]
  * - fixed a bug for auto_3D and cross_3D
  * 
@@ -394,10 +398,10 @@ void autoCorr(Config para){
 
 
   /* DEBUGGING
-  if(para.rank == MASTER){
-    printTree(para, para.fileOutName, dataTree, ROOT, 1, FIRSTCALL);
-    exit(-1);
-  }
+     if(para.rank == MASTER){
+     printTree(para, para.fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+     exit(-1);
+     }
   */
   
   /* compute pairs */
@@ -981,6 +985,13 @@ void ggCorr(Config para){
   comment(para, "building trees...");
   sourceTree = buildTree(&para, &source, &mask, dimStart, FIRSTCALL);   freePoint(para, source);
   lensTree   = buildTree(&para, &lens,   &mask, dimStart, FIRSTCALL);   freePoint(para, lens);
+  
+  
+  /* DEBUGGING THIS DOES NOT WORK - check printTree for gg lensing
+  if(para.rank == MASTER){
+    printTree(para, "tree.out", sourceTree, ROOT, 1, FIRSTCALL);
+  }
+  */
   
   comment(para, "done.\n");
   comment(para, "Correlating lenses with sources...       ");
@@ -2500,7 +2511,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.42\n\n\
+                (Super W Of Theta) MPI version 0.43\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2594,15 +2605,21 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   if( (para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP) && para->proj == THETA ){
     para->proj = COMO; 
   }
+
   /* Adjust number of dimensions */
   if(para->proj == COMO || para->proj == PHYS || para->corr == AUTO_3D || para->corr == CROSS_3D) NDIM  = 3;
   
-  /* For number and wp(rp), set NDIM = 3 and only bootsrap in 2D */
+  /* For number, GGLENS, or wp(rp), set NDIM = 3 and only bootsrap in 2D */
   if(para->corr == NUMBER || para->corr == AUTO_WP || para->corr == CROSS_WP){ 
     NDIM  = 3;
     para->resample2D = 1;
   }
   
+  /* For GGLENS only bootsrap in 2D */
+  if(para->corr == GGLENS ){ 
+    para->resample2D = 1;
+  }
+
   /* For 3D cartesian coordinates, angular separation replaced by 3D distance */
   if(para->corr == AUTO_3D || para->corr == CROSS_3D){
     para->distAng   = &dist3D;

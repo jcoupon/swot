@@ -83,13 +83,13 @@ change column ids with: -cols1 1,2,3[,4]
 lenses (-cols1) RA DEC z sigz
 change column ids with: -cols1 1,2,3,4
 sources (-cols2) RA DEC z sigz e1 e2 weight
-change column ids with: -cols1 1,2,3,4,5,6,7
+change column ids with: -cols2 1,2,3,4,5,6,7
 
 * default input format for "gglens" to compute calibration factor (-calib yes)
 lenses (-cols1) RA DEC z sigz
 change column ids with: -cols1 1,2,3,4
 sources (-cols2) RA DEC z sigz calib e2 weight
-change column ids with: -cols1 1,2,3,4,5,6,7
+change column ids with: -cols2 1,2,3,4,5,6,7
 Where calib = 1+m or c
 
 -------------------------------------------------------------------------
