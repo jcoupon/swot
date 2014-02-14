@@ -38,6 +38,10 @@
  *
  * Version history
  *
+ * v 0.44 [Jean]
+ * - bug corrected in version 0.42 ALSO corrected
+ * for  cross_3D (unlike previsoulsy stated)
+ *
  * v 0.43 [Jean]
  * - sampling for gg lensing is done wrt to the
  * source 2D distribution
@@ -743,8 +747,8 @@ void crossCorr(Config para){
     double *R          = (double *)malloc(para.nbins*sizeof(double));
     double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
     for(i=0;i<para.nbins;i++){
-      if(para.corr == AUTO || para.corr == AUTO_3D) sum = (double)D1D2.NN[i];
-      if(para.corr == AUTO_WP) {
+      if(para.corr == CROSS || para.corr == CROSS_3D) sum = (double)D1D2.NN[i];
+      if(para.corr == CROSS_WP) {
 	sum = 0.0;
 	for(j=0;j<para.nbins;j++) sum += D1D2.NN[i + para.nbins*j];
       }
@@ -1405,7 +1409,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
   }else{
     
     
-    if(para->corr != AUTO_3D && para->corr != AUTO_3D){
+    if(para->corr != AUTO_3D && para->corr != CROSS_3D){
       switch(para->proj){
       case COMO:
 	d  = distComo_tree1*deltaTheta*PI/180.0;              /* Transverse distance in comoving coordinates (Mpc) */
@@ -2511,7 +2515,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.43\n\n\
+                (Super W Of Theta) MPI version 0.44\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
