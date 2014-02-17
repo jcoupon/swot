@@ -38,6 +38,10 @@
  *
  * Version history
  *
+ * v 0.45 [Jean]
+ * - added an option to compute subsample variance
+ * (-err subsample) for -corr number estimator
+ *
  * v 0.44 [Jean]
  * - bug corrected in version 0.42 ALSO corrected
  * for  cross_3D (unlike previsoulsy stated)
@@ -282,11 +286,9 @@ void numberCount(Config para){
     switch(para.err){
     case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
     case BOOTSTRAP: norm = 1.0/(double)(para.nsamples - 1); break;
+    case SUBSAMPLE: norm = (double)(para.nsamples - 1); break;
     }	
     
-    /* DEBUGGING - to get the error for subsamples
-       norm = (double)(para.nsamples - 1);
-    */
 
     for(i=0;i<para.nbins;i++){
      
@@ -314,6 +316,7 @@ void numberCount(Config para){
     switch(para.err){
     case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples).\n", para.nsamples); break;
     case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples).\n", para.nsamples); break;
+    case SUBSAMPLE: fprintf(fileOut, "# Resampling: subsample (%d samples).\n", para.nsamples); break;
     }
     fprintf(fileOut, "#  x            N(x)         err(total) err(resampling) err(poisson)      <R>\n");
     for(i=0;i<para.nbins;i++){
@@ -1322,17 +1325,18 @@ Result Nobjects(const Config *para, const Tree *tree1, const long i, int firstCa
       
       result.NN[k] +=  1.0*w;
       for(l=0;l<para->nsamples;l++){
-	
-	/* DEBUGGING - tot get the error for subsamples 
-	   double weight =  tree1->w[para->nsamples*i + l];
-	   if(weight == 0){
-	   weight = 1;
-	   }else{
-	   weight = 0;
-	   }
-	   result.NN[para->nbins*(l+1) + k] += weight;
-      	*/
+
+	/* DEBUGGING for SUBSAMPLE
+	  double weight =  tree1->w[para->nsamples*i + l];
+	  if(weight == 0){
+	    weight = 1;
+	  }else{
+	    weight = 0;
+	  }
+	  result.NN[para->nbins*(l+1) + k] += weight;
+	*/
 	result.NN[para->nbins*(l+1) + k] += tree1->w[para->nsamples*i + l]*w;
+	
       }
       result.meanR[k] += NN*w;
     }
@@ -1992,6 +1996,7 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
 	   * j: subsample index
 	   */
 	  switch(para->err){
+	  case SUBSAMPLE: mask->w[para->nsamples*i + j] = (i == j);                 break;
 	  case JACKKNIFE: mask->w[para->nsamples*i + j] = !(i == j);                break;
 	  case BOOTSTRAP: mask->w[para->nsamples*i + randInt(para->nsamples)] += 1; break;
 	  }
@@ -2515,7 +2520,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.44\n\n\
+                (Super W Of Theta) MPI version 0.45\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2549,7 +2554,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
       printf("nbins          %d\t # Number of bins\n", para->nbins);
       printf("log            yes\t # Logarithmic bins [yes,no]\n");
-      printf("err            jackknife # Resampling method [bootstrap,jackknife]\n");
+      printf("err            jackknife # Resampling method [bootstrap,jackknife,subsample]\n");
       printf("                         # or [bootstrap2D,jackknife2D]\n");
       printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
@@ -2645,6 +2650,13 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   }
   para->Delta = (para->max - para->min)/(double)para->nbins;
   
+  if(para->err == SUBSAMPLE && para->corr != NUMBER){
+    if(para->verbose) fprintf(stderr,"\n%s: **ERROR** \"subsample\" error option only defined for \"number\". Exiting...\n", MYNAME);
+    MPI_Finalize();
+    exit(EXIT_FAILURE);
+  }
+
+
   return;
 }
 
@@ -2742,6 +2754,7 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     if(!strcmp(arg,"jackknife"))      para->err = JACKKNIFE;
     else if(!strcmp(arg,"bootstrap")) para->err = BOOTSTRAP;
+    else if(!strcmp(arg,"subsample")) para->err = SUBSAMPLE;
     else if(!strcmp(arg,"bootstrap2D")){
       para->err = BOOTSTRAP;
       para->resample2D = 1;

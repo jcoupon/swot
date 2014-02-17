@@ -60,6 +60,7 @@
 #define ROOT        0
 #define JACKKNIFE   0
 #define BOOTSTRAP   1
+#define SUBSAMPLE   2
 
 /* maximum stack "level" permitted. This means 
  * that up to 2^NSTACK objects can be treated */
