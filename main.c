@@ -38,13 +38,20 @@
  *
  * Version history
  *
+ * v 0.46 [Jean]
+ * - in "correlation" and "number" functions,
+ *   removed the additionnal Poisson contribution 
+ *   that was wrongly added once more to the 
+ *   sample variance new output format is 
+ *   [...] err(resampling)  err(resampling-poisson) err(poisson) [...]
+ *
  * v 0.45 [Jean]
  * - added an option to compute subsample variance
- * (-err subsample) for -corr number estimator
+ *   (-err subsample) for -corr number estimator
  *
  * v 0.44 [Jean]
  * - bug corrected in version 0.42 ALSO corrected
- * for  cross_3D (unlike previsoulsy stated)
+ *   for cross_3D (unlike previously stated)
  *
  * v 0.43 [Jean]
  * - sampling for gg lensing is done wrt to the
@@ -274,9 +281,8 @@ void numberCount(Config para){
       }
     }
 
- /* Errors  ------------------------------------------------------------------------ */
+    /* Errors  ------------------------------------------------------------------------ */
     
-
     /* mean N and errors */
     double *Nmean = (double *)malloc(para.nbins*sizeof(double));
     double *err_r = (double *)malloc(para.nbins*sizeof(double));
@@ -289,7 +295,6 @@ void numberCount(Config para){
     case SUBSAMPLE: norm = (double)(para.nsamples - 1); break;
     }	
     
-
     for(i=0;i<para.nbins;i++){
      
       Nmean[i] = err_r[i] = 0.0;
@@ -308,8 +313,7 @@ void numberCount(Config para){
       /* 2. poisson error ~1/N */
       err_p[i] = sqrt(N.NN[para.nbins*0+i]);
     }
-    
-    
+        
     /* write file out ------------------------------------------------------------------------ */
     fileOut = fopen(para.fileOutName, "w");    
     fprintf(fileOut, "# Number counts.\n");       
@@ -318,9 +322,9 @@ void numberCount(Config para){
     case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples).\n", para.nsamples); break;
     case SUBSAMPLE: fprintf(fileOut, "# Resampling: subsample (%d samples).\n", para.nsamples); break;
     }
-    fprintf(fileOut, "#  x            N(x)         err(total) err(resampling) err(poisson)      <R>\n");
+    fprintf(fileOut, "#  x            N(x)    err(resamp) err(resamp-poisson) err(poisson)      <R>\n");
     for(i=0;i<para.nbins;i++){
-      fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f\n",  R[i], N.NN[i], sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i]);
+      fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f\n",  R[i], N.NN[i], err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i]);
     }
     fclose(fileOut);
    
@@ -336,8 +340,6 @@ void numberCount(Config para){
 	    cov[para.nbins*i+j] += norm*(Nmean[i]-N.NN[para.nbins*(l+1)+i])
 	      *(Nmean[j]-N.NN[para.nbins*(l+1)+j]);
 	  }
-	  /* add poisson error to diagonal */
-	  if(i == j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
 	  fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
 	}
 	fprintf(fileOut,"\n");
@@ -542,16 +544,16 @@ void autoCorr(Config para){
       /* If auto correlation  ------------------------------------------------------------------------ */
     case AUTO:  case AUTO_3D:
       if(para.proj == COMO){
-	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+	fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }else if(para.proj == PHYS){
-	fprintf(fileOut, "#  R(physical)  w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+	fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }else{
-	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+	fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
       }
       for(i=0;i<para.nbins;i++){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
+		err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
 		DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
       }
       break;
@@ -561,9 +563,9 @@ void autoCorr(Config para){
       fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
       fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
       if(para.proj == COMO){
-	fprintf(fileOut, "# rp (comoving) wp         err(total) err(resampling) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
+	fprintf(fileOut, "# rp (comoving) wp    err(resamp) err(resamp-poisson) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
       }else if(para.proj == PHYS){
-	fprintf(fileOut, "# rp (physical) wp         err(total) err(resampling) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
+	fprintf(fileOut, "# rp (physical) wp    err(resamp) err(resamp-poisson) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
       }
       for(i=0;i<para.nbins;i++){
 	RR_sum = 0;
@@ -581,7 +583,7 @@ void autoCorr(Config para){
 	
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0), 
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
+		err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))),  err_p[i], meanR[i],
 		DD_sum, DR_sum, RR_sum,  DD.N1[0],  RR.N1[0]);
       }
       break;
@@ -626,8 +628,6 @@ void autoCorr(Config para){
 	    }
 	    break;
 	  }
-	  /* add poisson error to diagonal */
-	  if(i == j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
 	  fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
 	}
 	fprintf(fileOut,"\n");
@@ -846,16 +846,16 @@ void crossCorr(Config para){
       /* If cross correlation  ------------------------------------------------------------------------ */
     case CROSS: case CROSS_3D:   
       if(para.proj == COMO){
-	fprintf(fileOut, "#  R(comoving)  w            err(total) err(resampling) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+	fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
       }else if(para.proj == PHYS){
-	fprintf(fileOut, "#  R(physical)  w            err(total) err(resampling) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+	fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
       }else{
-	fprintf(fileOut, "#  theta        w            err(total) err(resampling) err(poisson)               <theta>          D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+	fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R1             D2R2          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
       }
       for(i=0;i<para.nbins;i++){
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, 0),
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
+		err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
 		D1D2.NN[i], D1R1.NN[i], D2R2.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
       }
       break;
@@ -865,9 +865,9 @@ void crossCorr(Config para){
       fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
       fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
       if(para.proj == COMO){
-	fprintf(fileOut, "#  rp(comoving) wp           err(total) err(resampling) err(poisson)     <rp>         sum(D1D2)         sum(D1R1)         sum(D2R2)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
+	fprintf(fileOut, "#  rp(comoving) wp      err(resamp) err(resamp-poisson) err(poisson)     <rp>         sum(D1D2)         sum(D1R1)         sum(D2R2)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
       }else if(para.proj == PHYS){
-	fprintf(fileOut, "#  rp(physical) wp           err(total) err(resampling) err(poisson)     <rp>         sum(D1D2)         sum(D1R1)         sum(D2R2)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
+	fprintf(fileOut, "#  rp(physical) wp      err(resamp) err(resamp-poisson) err(poisson)     <rp>         sum(D1D2)         sum(D1R1)         sum(D2R2)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
       }
      
       for(i=0;i<para.nbins;i++){
@@ -885,7 +885,7 @@ void crossCorr(Config para){
 	}
 	fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n", 
 		R[i], wp(para, para.estimator, D1D2, R1R2, D1R1, D2R2, -1, i, 0),
-		sqrt(SQUARE(err_r[i])+SQUARE(err_p[i])), err_r[i], err_p[i], meanR[i],
+		err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
 		D1D2_sum, D1R1_sum, D2R2_sum, R1R2_sum,  D1D2.N1[0], R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
       }
       break;
@@ -930,8 +930,6 @@ void crossCorr(Config para){
 	    }
 	    break;
 	  }
-	  /* add poisson error to diagonal */
-	  if(i==j) cov[para.nbins*i+j] += SQUARE(err_p[i]);
 	  fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
 	}
 	fprintf(fileOut,"\n");
@@ -2520,7 +2518,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.45\n\n\
+                (Super W Of Theta) MPI version 0.46\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
