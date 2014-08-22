@@ -186,7 +186,7 @@ typedef struct Config
   /* input and output files information */
   char fileInName1[1000],  fileInName2[1000]; 
   char fileRanName1[1000], fileRanName2[1000];
-  char fileOutName[1000];
+  char fileOutName[1000],  RRInFileName[1000], RROutFileName[1000];
   
   /* column ids for input files */
   int data1Id[NIDSMAX], data2Id[NIDSMAX];

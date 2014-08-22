@@ -22,7 +22,10 @@
  * - measure the tangential shear
  * - Do the randoms one by one or all together at once? -> Still need 
  *   to decide this question. NOT URGENT
- * 
+ * - create an option -saveRR file and -loadRR file
+ *
+ *
+ *
  * Contributions:
  * - the algorithm to compute the number of pairs from a tree is 
  *   based on, but slightly different to, Martin Kilbinger's Athena code:
@@ -37,6 +40,10 @@
  * - errors for w(R) when using weights are zero
  *
  * Version history
+ *
+ * v 0.47 [Jean]
+ * - added options -RR_in and RR_out
+ *   
  *
  * v 0.46 [Jean]
  * - in "correlation" and "number" functions,
@@ -288,7 +295,7 @@ void numberCount(Config para){
     double *err_r = (double *)malloc(para.nbins*sizeof(double));
     double *err_p = (double *)malloc(para.nbins*sizeof(double));
     
-    double norm;
+    double norm, norm_N;
     switch(para.err){
     case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
     case BOOTSTRAP: norm = 1.0/(double)(para.nsamples - 1); break;
@@ -302,10 +309,12 @@ void numberCount(Config para){
       /* 1. resampling error */ 
       if(para.nsamples > 1){ /* mean */
 	for(l=0;l<para.nsamples;l++){
-	  Nmean[i] += N.NN[para.nbins*(l+1)+i]/(double)para.nsamples;
+	  //norm_N = N.N1[0]/N.N1[l+1];
+	  norm_N = 1.0;
+	  Nmean[i] += norm_N  * N.NN[para.nbins*(l+1)+i]/(double)para.nsamples;
 	}
 	for(l=0;l<para.nsamples;l++){ /* dispersion */
-	  err_r[i] += SQUARE(Nmean[i]-N.NN[para.nbins*(l+1)+i]);
+	  err_r[i] += SQUARE(Nmean[i]-norm_N*N.NN[para.nbins*(l+1)+i]);
 	}
 	err_r[i] = sqrt(norm*err_r[i]);
       }
@@ -374,7 +383,7 @@ void autoCorr(Config para){
   Result DD, DR, RR;
   Mask mask;
   char  fileOutName[1000];
-  FILE *fileOut;
+  FILE *fileOut, *fileRR;
   
   /* read files */
   if(para.rank == MASTER){
@@ -405,8 +414,9 @@ void autoCorr(Config para){
   long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
   long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
 
-
-  /* DEBUGGING
+  
+  /* DEBUGGING */
+  /*
      if(para.rank == MASTER){
      printTree(para, para.fileOutName, dataTree, ROOT, 1, FIRSTCALL);
      exit(-1);
@@ -416,25 +426,85 @@ void autoCorr(Config para){
   /* compute pairs */
   switch (para.corr){
   case AUTO: case AUTO_3D:
-    comment(para, "RR...       "); RR = Npairs(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
+    if (!strcmp(para.RRInFileName, "")){
+      comment(para, "RR...       "); RR = Npairs(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
+    }      
     comment(para, "DR...       "); DR = Npairs(&para, &dataTree,   ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
     comment(para, "DD...       "); DD = Npairs(&para, &dataTree,   ROOT, &dataTree,   nodeSlaveData, FIRSTCALL);
     break;
   case AUTO_WP:
-    comment(para, "RR(rp,pi)...       "); RR = Npairs3D(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
+    if (!strcmp(para.RRInFileName, "")){
+      comment(para, "RR(rp,pi)...       "); RR = Npairs3D(&para, &randomTree, ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
+    }
     comment(para, "DR(rp,pi)...       "); DR = Npairs3D(&para, &dataTree,   ROOT, &randomTree, nodeSlaveRan,  FIRSTCALL);
     comment(para, "DD(rp,pi)...       "); DD = Npairs3D(&para, &dataTree,   ROOT, &dataTree,   nodeSlaveData, FIRSTCALL);
     break;
   }
-  
+
   freeMask(para, mask);
   freeTree(para, randomTree);
   freeTree(para, dataTree);
   
   /* each slave sends the result and master sums everything up */
-  comResult(para, RR, para.size, 0);
+  if (!strcmp(para.RRInFileName, "")){
+    comResult(para, RR, para.size, 0);
+  }
   comResult(para, DR, para.size, 0);
   comResult(para, DD, para.size, 0);
+  
+  /* print out results */
+  if(para.rank == MASTER){
+    
+    /* Save RR pairs */
+    if (strcmp(para.RROutFileName, "")){
+      fileRR = fopen(para.RROutFileName, "w");    
+      if(para.corr == AUTO || para.corr == AUTO_3D){
+	fwrite(RR.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
+	fwrite(RR.N1, sizeof(double),    para.nsamples+1, fileRR);
+	fwrite(RR.N2, sizeof(double),    para.nsamples+1, fileRR);
+	fwrite(RR.meanR, sizeof(double), para.nbins, fileRR);
+      }else if(para.corr == AUTO_WP){
+	fwrite(RR.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
+	fwrite(RR.N1,    sizeof(double), para.nsamples+1, fileRR);
+	fwrite(RR.N2,    sizeof(double), para.nsamples+1, fileRR);
+	fwrite(RR.meanR, sizeof(double), para.nbins, fileRR);
+	fwrite(RR.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
+      }
+      fclose(fileRR);
+    }
+    
+    /* Get RR pairs from previous run */
+    if (strcmp(para.RRInFileName, "")){
+      fileRR = fopen(para.RRInFileName, "r");    
+      if(para.corr == AUTO || para.corr == AUTO_3D){
+	RR.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+	RR.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	RR.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	RR.meanR = (double *)malloc(para.nbins*sizeof(double));
+
+	fread(RR.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
+	fread(RR.N1, sizeof(double),    para.nsamples+1, fileRR);
+	fread(RR.N2, sizeof(double),    para.nsamples+1, fileRR);
+	fread(RR.meanR, sizeof(double), para.nbins, fileRR);
+      }else if(para.corr == AUTO_WP){
+	RR.NN    = (double *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(double));
+	RR.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	RR.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	RR.meanR = (double *)malloc(para.nbins*sizeof(double));
+	RR.NN_s  = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+
+	fread(RR.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
+	fread(RR.N1,    sizeof(double), para.nsamples+1, fileRR);
+	fread(RR.N2,    sizeof(double), para.nsamples+1, fileRR);
+	fread(RR.meanR, sizeof(double), para.nbins, fileRR);
+	fread(RR.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
+      }
+      fclose(fileRR);
+    }
+  }
+  
+
+
   
   /* print out results */
   if(para.rank == MASTER){
@@ -643,7 +713,9 @@ void autoCorr(Config para){
     free(err_p);
   }
   
-  freeResult(para, RR);
+  if(!strcmp(para.RRInFileName, "") || para.rank == MASTER){
+    freeResult(para, RR);
+  }
   freeResult(para, DR);
   freeResult(para, DD);
   
@@ -1298,11 +1370,15 @@ Result Nobjects(const Config *para, const Tree *tree1, const long i, int firstCa
     result.meanR = (double *)malloc(para->nbins*sizeof(double));
     for(k = 0; k < para->nbins; k++) result.meanR[k]    = 0.0;
     
-    /* Needed to prevent the code from crashing, but not used */
+    /* total number of objects per sample */
     result.N1 = (double *)malloc((para->nsamples+1)*sizeof(double));
     result.N2 = (double *)malloc((para->nsamples+1)*sizeof(double));
     result.w  = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
     
+    result.N1[0] = tree1->N[ROOT];
+    for(l=0;l<para->nsamples;l++){
+      result.N1[l+1] = tree1->Ntot[l];
+    }
   }
   
   /* compute the number of objects recursively */
@@ -2342,7 +2418,7 @@ void comResult(const Config para, Result result, long Ncpu, int split){
       MPI_Send(result.NN, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
       MPI_Send(result.N1, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
       MPI_Send(result.N2, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
-      MPI_Send(result.meanR,    para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
+      MPI_Send(result.meanR,   para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
       break;
     case GGLENS:
       MPI_Send(result.GG, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
@@ -2457,10 +2533,12 @@ void initPara(int argc, char **argv, Config *para){
   strcpy(MYNAME, "swot");
   
   /* default parameters below */
-  strcpy(para->fileInName1,"data1.cat");
-  strcpy(para->fileInName2,"data2.cat");
-  strcpy(para->fileRanName1,"ran1.cat");
-  strcpy(para->fileRanName2,"ran2.cat");
+  strcpy(para->fileInName1, "data1.cat");
+  strcpy(para->fileInName2, "data2.cat");
+  strcpy(para->fileRanName1, "ran1.cat");
+  strcpy(para->fileRanName2, "ran2.cat");
+  strcpy(para->RRInFileName, "");
+  strcpy(para->RROutFileName, "");
   /* colum ids, default: 
      ids           1  2   3   4   5  6  7 
      [lensing]     RA DEC z  deltaz e1 e2 weight 
@@ -2518,7 +2596,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.46\n\n\
+                (Super W Of Theta) MPI version 0.47\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2557,6 +2635,8 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
+      printf("RR_in          no\t # file for pre-computed RR pairs (only for clustering) \n");
+      printf("RR_out         no\t # file for saving RR pairs (only for clustering) \n");
       printf("# ---------------------------------------------------------- #\n");
       printf("# Cosmology (for gal-gal correlations, w(R) and xi(rp,PI))   #\n");
       printf("# ---------------------------------------------------------- #\n");
@@ -2632,7 +2712,6 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
     para->distAng   = &dist3D;
   }
   
-
   /* wp(rp) integrated along pi in linear scale */
   // DEBUGGING para->Delta_pi = (para->max - para->min)/(double)para->nbins;
   para->Delta_pi = (para->pi_max - 0.0)/(double)para->nbins;
@@ -2799,6 +2878,16 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     if(!strcmp(arg,"yes")) para->xi = 1;
     else para->xi = 0;
+  }else if(!strcmp(field,"RR_in")){
+    checkArg(field,arg,para);
+    if(strcmp(field,"no")){
+      strcpy(para->RRInFileName, arg);
+    }
+  }else if(!strcmp(field,"RR_out")){
+    checkArg(field,arg,para);
+    if(strcmp(field,"no")){
+      strcpy(para->RROutFileName, arg);
+    }
   }else if(!strcmp(field,"c")){
     /* do nothing, this is the option for the config file */
   }else{
@@ -3190,6 +3279,7 @@ Point readCat(const Config para, char *fileInName, int id[NIDSMAX], int weighted
   fclose(fileIn);
   return data;
 }
+
 
 FILE *fopenAndCheck(const char *fileName, char *mode, int verbose){
   /* Checks if fileName exists and opens it. Exits otherwise. */
