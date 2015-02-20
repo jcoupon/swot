@@ -41,6 +41,9 @@
  *
  * Version history
  *
+ * v 0.48 [Jean]
+ * - bug corrected for -RR_in and RR_out
+ *
  * v 0.47 [Jean]
  * - added options -RR_in and RR_out
  *   
@@ -449,12 +452,12 @@ void autoCorr(Config para){
   if (!strcmp(para.RRInFileName, "")){
     comResult(para, RR, para.size, 0);
   }
+
   comResult(para, DR, para.size, 0);
   comResult(para, DD, para.size, 0);
   
-  /* print out results */
+  /* RR pairs */
   if(para.rank == MASTER){
-    
     /* Save RR pairs */
     if (strcmp(para.RROutFileName, "")){
       fileRR = fopen(para.RROutFileName, "w");    
@@ -736,7 +739,7 @@ void crossCorr(Config para){
   Result D1D2, D1R1, D2R2, R1R2;
   Mask mask;
   char  fileOutName[1000];
-  FILE *fileOut;
+  FILE *fileOut, *fileRR;
   
   /* read files */
   if(para.rank == MASTER){
@@ -790,13 +793,17 @@ void crossCorr(Config para){
   /* compute pairs */
   switch (para.corr){
   case CROSS: case CROSS_3D: 
-    comment(para, "R1R2...       "); R1R2 = Npairs(&para, &randomTree1, ROOT, &randomTree2, ROOT,  FIRSTCALL);
+    if (!strcmp(para.RRInFileName, "")){
+      comment(para, "R1R2...       "); R1R2 = Npairs(&para, &randomTree1, ROOT, &randomTree2, ROOT,  FIRSTCALL);
+    }
     comment(para, "D1R1...       "); D1R1 = Npairs(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
     comment(para, "D2R2...       "); D2R2 = Npairs(&para, &dataTree2,   ROOT, &randomTree2, ROOT,  FIRSTCALL);
     comment(para, "D1D2...       "); D1D2 = Npairs(&para, &dataTree1,   ROOT, &dataTree2,   nodeSlaveData2, FIRSTCALL);
     break;
   case CROSS_WP:
-    comment(para, "R1R2(rp,pi)...       "); R1R2 = Npairs3D(&para, &randomTree1, ROOT, &randomTree2, ROOT,  FIRSTCALL);
+    if (!strcmp(para.RRInFileName, "")){
+      comment(para, "R1R2(rp,pi)...       "); R1R2 = Npairs3D(&para, &randomTree1, ROOT, &randomTree2, ROOT,  FIRSTCALL);
+    }
     comment(para, "D1R1(rp,pi)...       "); D1R1 = Npairs3D(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
     comment(para, "D2R2(rp,pi)...       "); D2R2 = Npairs3D(&para, &dataTree2,   ROOT, &randomTree2, ROOT,  FIRSTCALL);
     comment(para, "D1D2(rp,pi)...       "); D1D2 = Npairs3D(&para, &dataTree1,   ROOT, &dataTree2,   nodeSlaveData2, FIRSTCALL);
@@ -810,11 +817,66 @@ void crossCorr(Config para){
   freeTree(para, dataTree2);
   
   /* each slave sends the result and master sums everything up */
-  comResult(para, R1R2, para.size, 1); /* "1" to tell MASTER to sum up the total number         */
+  if (!strcmp(para.RRInFileName, "")){
+    comResult(para, R1R2, para.size, 1); /* "1" to tell MASTER to sum up the total number         */
+  }
   comResult(para, D1R1, para.size, 0); /* of objects since R2 has been partitionned among cpus  */
   comResult(para, D2R2, para.size, 1);
   comResult(para, D1D2, para.size, 0);
+
+  /* RR pairs */
+  if(para.rank == MASTER){
+    /* Save RR pairs */
+    if (strcmp(para.RROutFileName, "")){
+      fileRR = fopen(para.RROutFileName, "w");    
+      if(para.corr == CROSS || para.corr == CROSS_3D){
+	fwrite(R1R2.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
+	fwrite(R1R2.N1, sizeof(double),    para.nsamples+1, fileRR);
+	fwrite(R1R2.N2, sizeof(double),    para.nsamples+1, fileRR);
+	fwrite(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+      }else if(para.corr == CROSS_WP){
+	fwrite(R1R2.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
+	fwrite(R1R2.N1,    sizeof(double), para.nsamples+1, fileRR);
+	fwrite(R1R2.N2,    sizeof(double), para.nsamples+1, fileRR);
+	fwrite(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+	fwrite(R1R2.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
+      }
+      fclose(fileRR);
+    }
+    
+    /* Get RR pairs from previous run */
+    if (strcmp(para.RRInFileName, "")){
+      fileRR = fopen(para.RRInFileName, "r");    
+      if(para.corr == CROSS || para.corr == CROSS_3D){
+	R1R2.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+	R1R2.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	R1R2.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	R1R2.meanR = (double *)malloc(para.nbins*sizeof(double));
+
+	fread(R1R2.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
+	fread(R1R2.N1, sizeof(double),    para.nsamples+1, fileRR);
+	fread(R1R2.N2, sizeof(double),    para.nsamples+1, fileRR);
+	fread(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+      }else if(para.corr == CROSS_WP){
+	R1R2.NN    = (double *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(double));
+	R1R2.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	R1R2.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	R1R2.meanR = (double *)malloc(para.nbins*sizeof(double));
+	R1R2.NN_s  = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+
+	fread(R1R2.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
+	fread(R1R2.N1,    sizeof(double), para.nsamples+1, fileRR);
+	fread(R1R2.N2,    sizeof(double), para.nsamples+1, fileRR);
+	fread(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+	fread(R1R2.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
+      }
+      fclose(fileRR);
+    }
+  }
   
+
+
+
   /* print out results */
   if(para.rank == MASTER){
    
@@ -1016,7 +1078,9 @@ void crossCorr(Config para){
     free(err_p);
   }
   
-  freeResult(para, R1R2);
+  if(!strcmp(para.RRInFileName, "") || para.rank == MASTER){
+    freeResult(para, R1R2);
+  }
   freeResult(para, D1R1);
   freeResult(para, D2R2);
   freeResult(para, D1D2);
@@ -1784,6 +1848,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
       
       GG = e1_source*w/SigCritInv;
       WW = w/SigCritInv;
+      //WW = w;
       
     }else{           /* Compute gg lensing signal */
       
@@ -2596,7 +2661,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.47\n\n\
+                (Super W Of Theta) MPI version 0.48\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2880,12 +2945,12 @@ void setPara(char *field, char *arg, Config *para){
     else para->xi = 0;
   }else if(!strcmp(field,"RR_in")){
     checkArg(field,arg,para);
-    if(strcmp(field,"no")){
+    if(strcmp(arg,"no")){
       strcpy(para->RRInFileName, arg);
     }
   }else if(!strcmp(field,"RR_out")){
     checkArg(field,arg,para);
-    if(strcmp(field,"no")){
+    if(strcmp(arg,"no")){
       strcpy(para->RROutFileName, arg);
     }
   }else if(!strcmp(field,"c")){
@@ -2897,7 +2962,8 @@ void setPara(char *field, char *arg, Config *para){
     exit(EXIT_FAILURE);
     */
   }
-  
+
+ 
   return;
 }
 
