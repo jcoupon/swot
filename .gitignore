@@ -4,8 +4,6 @@
 
 # for C
 
-bin/*
-
 # Object files
 *.o
 *.ko
