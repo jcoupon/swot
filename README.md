@@ -4,15 +4,15 @@ Authors: Jean Coupon, Alexie Leauthaud, Martin Kilbinger.
 
 ## Description
 
-`SWOT` is a software written in C to compute astrophysical two-point correlation functions and weighted histograms, with area-based resampling for fast error and covariance matrix estimations.
+`SWOT` is a software written in C to compute astrophysical two-point correlation functions and weighted histograms, along with fast sky-based resampling error and covariance matrix estimations.
 
 Available estimators include:
-- angular two-point correlation function (auto and cross), "w(theta)"
-- projected two-point correlation function (auto and cross), "w(R)"
-- galaxy-galaxy lensing, "Delta Sigma (R)"
-- 3D two-point correlation function, "xi(r)"
-- 3D two-point correlation function projected along the line of sight, "xi(rp, pi), wp(rp)"
-- weighted histogram (e.g. "VMAX" estimator of mass functions)
+- angular two-point correlation function (auto and cross), "w(theta)",
+- projected two-point correlation function (auto and cross), "w(R)",
+- galaxy-galaxy lensing, "Delta Sigma (R)",
+- 3D two-point correlation function, "xi(r)",
+- 3D two-point correlation function projected along the line of sight, "xi(rp, pi), wp(rp)",
+- and weighted histogram (e.g. "VMAX" estimator of mass functions).
 
 Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly, but not limited to:
 - data storage in binary trees,
@@ -27,6 +27,10 @@ Contributions:
 If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 
 ## Installation
+
+1. Download the latest version here https://github.com/jcoupon/swot/releases/latest
+2. Untar the archive and 
+
 
 ## Usage
 
