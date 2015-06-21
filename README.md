@@ -4,7 +4,7 @@ Authors: Jean Coupon, Alexie Leauthaud, Martin Kilbinger.
 
 ## Description
 
-`SWOT` is a program to compute astrophysical two-point correlation functions and weighted histograms, with area-based resampling for fast error and covariance matrix estimations.
+`SWOT` is a software written in C to compute astrophysical two-point correlation functions and weighted histograms, with area-based resampling for fast error and covariance matrix estimations.
 
 Available estimators include:
 - angular two-point correlation function (auto and cross), "w(theta)"
@@ -20,8 +20,11 @@ Each estimator is wrapped around a set of "divide and conquer" algorithms, mainl
 - parellelization.
 
 Contributions:
-- The core algorithm to compute the number of pairs from a tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
-- The galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. (2010),  2010ApJ...709...97L).
+- the core algorithm to compute the number of pairs from a tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
+- the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. (2010),  2010ApJ...709...97L).
+- the rest was written by Jean Coupon.
+
+If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 
 ## Installation
 
