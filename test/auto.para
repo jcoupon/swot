@@ -2,11 +2,11 @@
 #----------------------------------------------------------#
 #Input catalogues                                          #
 #----------------------------------------------------------#
-data1          data/data1.cat  # input data catalogue #1
+data1          data/gals_small.ascii  # input data catalogue #1
 cols1          1,2	  # Column ids for data1
 data2          data/data1.cat  # input data catalogue #2
 cols2          1,2	  # Column ids for data2
-ran1           data/ran1.cat	  # input random catalogue #1
+ran1           data/ran_small.ascii	  # input random catalogue #1
 rancols1       1,2	  # Column ids for ran1
 ran2           data/ran1.cat	  # input random catalogue #2
 rancols2       1,2	  # Column ids for ran2

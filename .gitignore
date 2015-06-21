@@ -4,6 +4,8 @@
 
 # for C
 
+data
+
 # Object files
 *.o
 *.ko
