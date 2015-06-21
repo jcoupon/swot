@@ -1,15 +1,13 @@
-/*-------------------------------------------------------------------------*
- *swot (Super W Of Theta)  mpi version                                     *
- *Jean Coupon, Alexie Leauthaud (2012)                                     *
- *-------------------------------------------------------------------------*
+# swot (Super W Of Theta)
 
-Feb. 8th, 2013
+Author: Jean Coupon
+Contributors:  Alexie Leauthaud, Martin Kilbinger
 
-Program to compute two-point correlation functions based on 
-"divide and conquer" algorithms, mainly, but not limited to:
-- data storage in a binary tree, 
+Program to compute astrophysical two-point correlation functions based on  "divide and conquer" algorithms, mainly, but not limited to:
+- data storage in a binary tree,
 - approximation at large scale,
 - parellelization.
+
 Supports auto and cross correlations and galaxy-galaxy lensing
 
 Contributions:
