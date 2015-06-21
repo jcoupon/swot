@@ -25,11 +25,15 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 
 ## Installation
 
+### Main software
+
 1. Download the latest version here https://github.com/jcoupon/swot/releases/latest
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
 
 The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your desired directory. 
+
+### Dependencies
 
 `SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires installed on your machine. If OPEN MPI or GSL is installed in a different directory than `usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly.
 
