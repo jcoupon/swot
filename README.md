@@ -18,7 +18,7 @@ Each estimator is wrapped around a set of "divide and conquer" algorithms, mainl
 
 Contributors:
 - the core algorithm to compute the number of pairs from a kd-tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
-- the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. (2010),  2010ApJ...709...97L).
+- the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. 2010, ApJ, 709, 97).
 - the rest was written by Jean Coupon.
 
 If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
