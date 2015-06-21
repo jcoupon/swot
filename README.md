@@ -66,9 +66,9 @@ Display the default configuration file:
 ## Options
 
 
-###  Estimator (`corr` and `est`)
+###  Estimator (`-corr` and `-est`)
 
-- `auto`, `cross`: two-point correlation function. The choice for the estimator can be made among:
+- `auto`, `cross`: two-point correlation function. The choice for the estimator (`-est`) can be made among:
 `ls`: Landy & Szalay (1993) estimator (default), `nat`: natural estimator: 1+DD/RR, `ham`: Hamilton (1993), or `peebles`: Peebles (1993).
 - `gglens`
 - `auto_wp`, `cross_wp`
@@ -76,10 +76,10 @@ Display the default configuration file:
 - `number`
 
 
-### Open angle (`OA`)
+### Open angle (`-OA`)
 
 From Athena's documentation:
-	"If two nodes see each other under angles which are smaller than the open-angle
+>	"If two nodes see each other under angles which are smaller than the open-angle
 	threshold (OATH in config file), the tree is not further descended and those
 	nodes are correlated directly. The mean, weighted galaxy ellipticities of the
 	both nodes are multiplied, the angular separation is the binned barycenter
