@@ -25,13 +25,13 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 
 ## Installation
 
-### Main software
+### SWOT
 
 1. Download the latest version here https://github.com/jcoupon/swot/releases/latest
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
 
-The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your desired directory. 
+The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your desired directory.
 
 ### Dependencies
 
@@ -43,6 +43,10 @@ To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI i
 ```
 
 To download and install GSL, please visit http://www.gnu.org/software/gsl/
+
+### VENICE
+
+`venice` is a companion software to draw random points out of DS9 or fits masks. See https://github.com/jcoupon/venice.
 
 ## Usage
 
