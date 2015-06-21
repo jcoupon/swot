@@ -92,9 +92,9 @@ From Athena's documentation:
 
 ### Input format (ascii files)
 
-* default input format for "number" [-weighted]
-RA DEC X [weight]
-change column ids with: -cols1 1,2,3[,4]
+`-weighted`: compute weighted quantities ([X]: column for the weights if available).
+
+* default input format for `number` `RA DEC X [weight]`: change column ids with: `-cols1 1,2,3[,4]`
 
 * default input format for "auto" and "cross" [-proj como/phys] [-weighted]
 RA DEC [z] [weight]
