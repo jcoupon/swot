@@ -15,7 +15,7 @@ OBJ         = $(SRC:.c=.o)
 GSL = /usr/local
 
 # Where MPI is installed
-MPI = /opt/openmpi-1.8.5/
+MPI = # /opt/openmpi-1.8.5/
 
 # source files
 SRCS    = main.c
