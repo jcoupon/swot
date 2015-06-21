@@ -31,7 +31,7 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
 
-The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your desired directory.
+The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your working directory.
 
 ### Dependencies
 
