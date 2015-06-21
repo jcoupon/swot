@@ -1,30 +1,52 @@
-CC      = mpicc	
-CFLAGS  = -I$(HOME)/local/include -use-asm
-LDFLAGS = -L$(HOME)/local/lib -lm -lmpi -lgsl -lgslcblas #-lfftw3 
-EXEC    = swot
-SRC     = main.c
-OBJ     = $(SRC:.c=.o)
+# Makefile for swot
 
+# compiler options
+MPICC       = mpicc
+CFLAGS      = # -use-asm # for old icc versions
+LDFLAGS      = 
+MPI_CFLAGS  = 
+MPI_LFLAGS  = 
+RM          = rm -f
+EXEC        = bin/swot
+SRC         = main.c
+OBJ         = $(SRC:.c=.o)
+
+# Where GSL library is installed
+GSL = /usr/local
+
+# Where MPI is installed
+MPI = /opt/openmpi-1.8.5/
+
+# source files
+SRCS    = main.c
+OBJS    = $(SRCS:.c=.o)
+
+# Headers for libraries
+CFLAGS     +=  -Iinclude  -I$(GSL)/include
+LDFLAGS     += -lm -lgsl -lgslcblas  -L$(GSL)/lib 
+MPI_CFLAGS +=  -I$(MPI)/include
+MPI_LFLAGS +=  -L$(MPI)/lib 
+
+.PHONY: all
 all: $(EXEC)
 
-$(EXEC) : $(OBJ)
-	$(CC) -o $@ $^ $(LDFLAGS)
+vpath %.h include
+vpath %.c src
 
-main.o: main.h
+$(EXEC):  $(OBJS)
+	$(MPICC) $(CFLAGS) $(LDFLAGS) $(MPI_CFLAGS) $(MPI_LFLAGS) -o $@ $^
 
-%.o: %.c
-	$(CC) -o $@ -c $< $(CFLAGS)
+%.o:  %.c 
+	$(MPICC) -c -o $@ $< $(CFLAGS) $(MPI_CFLAGS)
 
-.PHONY: clean mrproper
+%.h:
 
+.PHONY: clean
 clean:
-	rm -rf *.o $(EXEC).tar
+	-${RM} ${OBJS}
 
-mrproper: clean
-	rm -rf $(EXEC)
+#tar:
+#	tar cvf $(EXEC).tar Makefile main.c main.h README $(EXEC)
 
-tar:
-	tar cvf $(EXEC).tar Makefile main.c main.h README $(EXEC)
-
-gzip:
-	gzip $(EXEC).tar
+#gzip:
+#	gzip $(EXEC).tar
