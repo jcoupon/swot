@@ -14,6 +14,14 @@
 #include "mpi.h"
 #include <gsl/gsl_integration.h>
 
+//#define SAMPLE_TYPE   char
+//#define MPI_SAMPLE_TYPE MPI_CHAR
+//#define SAMPLE_MAX 256
+
+#define SAMPLE_TYPE   unsigned short
+#define MPI_SAMPLE_TYPE MPI_UNSIGNED_SHORT
+#define SAMPLE_MAX 65535
+
 /* useful constants */
 #define PI    3.14159265358979323846
 #define TWOPI 6.283185307179586476925287
@@ -117,7 +125,7 @@ typedef struct Tree
   double *N, *Ntot;
   
   /* statistical weights for each sample */ 
-  char *w;
+  SAMPLE_TYPE *w;
   
   /* point with mean properties of the node (pointer to 
    * a series of "size" elements arrays) */ 
@@ -131,7 +139,7 @@ typedef struct Mask
   double *min, *max;
   
   /* weights - has nsamples size */
-  char *w;
+  SAMPLE_TYPE *w;
 } Mask;
 
 /* result structure (corr. function and errors) ----------- */
@@ -175,7 +183,7 @@ typedef struct Config
   double deltaz, min, max, Delta, Delta_pi, OA, pi_max; 
   
   /* error method JACKKNIFE or BOOTSTRAP */
-  int err, nsamples;
+  int err, nsamples, nsub;
   
   /* cosmology */
   double a[4];

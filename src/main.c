@@ -427,7 +427,6 @@ void autoCorr(Config para){
      exit(-1);
      }
   */
-  
   /* compute pairs */
   switch (para.corr){
   case AUTO: case AUTO_3D:
@@ -1960,7 +1959,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     result.right  = (long *)malloc(result.size*sizeof(long)); 
     result.N      = (double *)malloc(result.size*sizeof(double)); 
     result.r      = (double *)malloc(result.size*sizeof(double));
-    result.w      = (char *)malloc(result.size*para->nsamples*sizeof(char));
+    result.w      = (SAMPLE_TYPE *)malloc(result.size*para->nsamples*sizeof(SAMPLE_TYPE));
     result.Ntot   = (double *)malloc(para->nsamples*sizeof(double));
     result.point  = createPoint(*para, result.size);
     if(para->corr != AUTO_3D && para->corr != CROSS_3D){
@@ -1998,7 +1997,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     }
     if(n == ndim){  /* "result.point" is in the subsample "j" */
       for(i=0;i<para->nsamples;i++){  /* loop over resamplings  */
- 	result.w[para->nsamples*local_index + i] = mask->w[para->nsamples*i+j];
+ 	result.w[para->nsamples*local_index + i] = mask->w[para->nsub*i+j];
       }
       break;
     }
@@ -2084,7 +2083,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
 
 void resample(const Config *para, const Point *data, int dim, Mask *mask, int firstCall){
   /* splits data into a number of sub samples, resample it and builds up a 
-   * mask with weights. (TO DO) Then send the mask (if MASTER) 
+   * mask with weights. Then send the mask (if MASTER) 
    * or receive it (if SLAVE). The mask is used in buildTree() 
    * to attribute a weight to each node. */
 
@@ -2104,42 +2103,42 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
     /* check up sample values value and evaluate depthSample */
     if(para->nsamples == 0){
       return;
-    }else if(para->nsamples > 256){
+    }else if(para->nsamples > SAMPLE_MAX || para->nsub > SAMPLE_MAX){
       if(para->verbose) 
-	fprintf(stderr,"\n%s: **ERROR** nsamples must be <= 256. Exiting...\n", MYNAME);
+	fprintf(stderr,"\n%s: **ERROR** nsamplesand nsub must be <= 256. Exiting...\n", MYNAME);
       MPI_Finalize();
       exit(EXIT_FAILURE);
-    }else if(lowestPowerOfTwo(para->nsamples, &depthSample) != para->nsamples){
+    }else if(lowestPowerOfTwo(para->nsub, &depthSample) != para->nsub){
       if(para->verbose)
-	fprintf(stderr,"\n%s: **ERROR** nsamples must be a power of 2. Exiting...\n", MYNAME);
+	fprintf(stderr,"\n%s: **ERROR** nsub must be a power of 2. Exiting...\n", MYNAME);
       MPI_Finalize();
       exit(EXIT_FAILURE);
     }
     
     /* initialisation */
-    mask->min = (double *)malloc(ndim*para->nsamples*sizeof(double));  
-    mask->max = (double *)malloc(ndim*para->nsamples*sizeof(double));  
-    mask->w   = (char *)malloc(para->nsamples*para->nsamples*sizeof(char));
+    mask->min = (double *)malloc(ndim*para->nsub*sizeof(double));  
+    mask->max = (double *)malloc(ndim*para->nsub*sizeof(double));  
+    mask->w   = (SAMPLE_TYPE *)malloc(para->nsamples*para->nsub*sizeof(SAMPLE_TYPE));
     
     if(para->rank == MASTER){
       
-      if(para->nsamples > data->N){
+      if(para->nsub > data->N){
 	if(para->verbose) 
-	  fprintf(stderr,"\n%s: **ERROR** nsamples must be < Npoints. Exiting...\n", MYNAME);
+	  fprintf(stderr,"\n%s: **ERROR** nsub must be < Npoints. Exiting...\n", MYNAME);
 	exit(EXIT_FAILURE);
       }
       
-      for(i=0;i<para->nsamples*para->nsamples;i++) mask->w[i] = 0;
+      for(i=0;i<para->nsamples*para->nsub;i++) mask->w[i] = 0;
 
       for(i=0;i<para->nsamples;i++){
-	for(j=0;j<para->nsamples;j++){
+	for(j=0;j<para->nsub;j++){
 	  /* i: resample draw index
 	   * j: subsample index
 	   */
 	  switch(para->err){
-	  case SUBSAMPLE: mask->w[para->nsamples*i + j] = (i == j);                 break;
-	  case JACKKNIFE: mask->w[para->nsamples*i + j] = !(i == j);                break;
-	  case BOOTSTRAP: mask->w[para->nsamples*i + randInt(para->nsamples)] += 1; break;
+	  case SUBSAMPLE: mask->w[para->nsub*i + j] = (i == j);                 break;
+	  case JACKKNIFE: mask->w[para->nsub*i + j] = !(i == j);                break;
+	  case BOOTSTRAP: mask->w[para->nsub*i + randInt(para->nsub)] += 1; break;
 	  }
 	}
       }
@@ -2184,9 +2183,9 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
   }
   
   if(firstCall){
-    MPI_Bcast(mask->min, ndim*para->nsamples, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
-    MPI_Bcast(mask->max, ndim*para->nsamples, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
-    MPI_Bcast(mask->w,   para->nsamples*para->nsamples, MPI_CHAR, MASTER, MPI_COMM_WORLD);
+    MPI_Bcast(mask->min, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+    MPI_Bcast(mask->max, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+    MPI_Bcast(mask->w,   para->nsamples*para->nsub, MPI_SAMPLE_TYPE, MASTER, MPI_COMM_WORLD);
   }
   
   return;
@@ -2631,7 +2630,8 @@ void initPara(int argc, char **argv, Config *para){
   para->nbins_pi  = 100;
   para->log       = 1;
   para->OA        = 0.05;
-  para->nsamples  = 32;
+  para->nsub      = 32;
+  para->nsamples  = para->nsub;
   para->err       = JACKKNIFE;
   para->cov_mat   = 0;
   para->xi        = 0;
@@ -2699,7 +2699,8 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("log            yes\t # Logarithmic bins [yes,no]\n");
       printf("err            jackknife # Resampling method [bootstrap,jackknife,subsample]\n");
       printf("                         # or [bootstrap2D,jackknife2D]\n");
-      printf("nsamples       %d\t # Number of samples for resampling (power of 2)\n", para->nsamples);
+      printf("nsub           %d\t # Number of subvolumes for resampling (power of 2)\n", para->nsamples);
+      printf("nsamples       %d\t # Number of samples for resampling (= nsub for jackknife)\n", para->nsub);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
       printf("RR_in          no\t # file for pre-computed RR pairs (only for clustering) \n");
@@ -2767,6 +2768,15 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   if(para->corr == NUMBER || para->corr == AUTO_WP || para->corr == CROSS_WP){ 
     NDIM  = 3;
     para->resample2D = 1;
+  }
+
+  /* If jackknife nsub != nsamples and check that nsamples >= nsub otherwise */
+  if(para->err == JACKKNIFE && para->nsamples != para->nsub ){
+    para->nsamples = para->nsub;
+    if(para->verbose) fprintf(stderr,"\n%s: **WARNING** nsamples set to nsub for jackknife.\n", MYNAME);
+  }
+  if(para->nsamples < para->nsub ){
+    if(para->verbose) fprintf(stderr,"\n%s: **WARNING** nsamples is < nsub.\n", MYNAME);
   }
   
   /* For GGLENS only bootsrap in 2D */
@@ -2909,6 +2919,9 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"nsamples")){
     checkArg(field,arg,para);
     para->nsamples = atoi(arg);
+  }else if(!strcmp(field,"nsub")){
+    checkArg(field,arg,para);
+    para->nsub = atoi(arg);
   }else if(!strcmp(field,"OA")){
     checkArg(field,arg,para);
     if(!strcmp(arg,"no")) para->OA = -1.0;
@@ -3372,9 +3385,9 @@ int getStrings(char *line, char *strings, char *delimit, long *N){
   j = 0;
   while(line[i] != '\0' && line[i] != '#' && line[i] != '\n'){
     begin = i;
-    while(line[i] == *delimit || line[i] == '\t' && (line[i] != '\0' || line[i] != '#' || line[i] != '\n')) i++;
+    while((line[i] == *delimit || line[i] == '\t') && (line[i] != '\0' || line[i] != '#' || line[i] != '\n')) i++;
     begin = i;
-    while(line[i] != *delimit && line[i] != '\t' && line[i] != '\0' && line[i] != '#' && line[i] != '\n') i++;
+    while((line[i] != *delimit && line[i] != '\t') && (line[i] != '\0' && line[i] != '#' && line[i] != '\n')) i++;
     length = i - begin;
     if(length > 0){
       strncpy(strings+NCHAR*j,&line[begin],length);
