@@ -4,7 +4,9 @@ Authors: Jean Coupon, Alexie Leauthaud, Martin Kilbinger.
 
 ## Description
 
-SWOT is a program to compute astrophysical two-point correlation functions and weighted histograms, based on  "divide and conquer" algorithms, mainly, but not limited to:
+`SWOT` is a program to compute astrophysical two-point correlation functions and weighted histograms, with area-based resampling for fast error and covariance matrix estimations.
+
+Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly, but not limited to:
 - data storage in a binary tree,
 - approximation at large scale,
 - parellelization.
