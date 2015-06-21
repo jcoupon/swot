@@ -1,7 +1,7 @@
 # swot (Super W Of Theta)
 
-Author: Jean Coupon
-Contributors:  Alexie Leauthaud, Martin Kilbinger
+Author: Jean Coupon.\n
+Contributors:  Alexie Leauthaud, Martin Kilbinger.
 
 Program to compute astrophysical two-point correlation functions based on  "divide and conquer" algorithms, mainly, but not limited to:
 - data storage in a binary tree,
