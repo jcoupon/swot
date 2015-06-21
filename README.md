@@ -14,13 +14,10 @@ Available estimators include:
 - 3D two-point correlation function projected along the line of sight, "xi(rp, pi), wp(rp)",
 - and weighted histogram (e.g. "VMAX" estimator of mass functions).
 
-Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly, but not limited to:
-- data storage in binary trees,
-- approximation at large scale,
-- parellelization.
+Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly (but not limited to), data storage in binary trees, approximation at large angular scale, and parellelization.
 
 Contributions:
-- the core algorithm to compute the number of pairs from a tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
+- the core algorithm to compute the number of pairs from a kd-tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
 - the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. (2010),  2010ApJ...709...97L).
 - the rest was written by Jean Coupon.
 
