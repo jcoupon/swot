@@ -29,7 +29,8 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 ## Installation
 
 1. Download the latest version here https://github.com/jcoupon/swot/releases/latest
-2. Untar the archive and 
+2. Untar the archive and change directory to `swot-X.Y.Z`
+3. Run `Make`
 
 
 ## Usage
