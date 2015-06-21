@@ -12,7 +12,7 @@ SRC         = main.c
 OBJ         = $(SRC:.c=.o)
 
 # Where GSL library is installed
-GSL = /usr/local
+GSL = # /usr/local
 
 # Where MPI is installed
 MPI = # /opt/openmpi-1.8.5/
