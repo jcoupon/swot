@@ -2,8 +2,8 @@
 
 # compiler options
 MPICC       = mpicc
-CFLAGS      = # -use-asm # for old icc versions
-LDFLAGS      = 
+CFLAGS      = -Iinclude# -use-asm # for old icc versions
+LDFLAGS     = -lm -lgsl -lgslcblas
 MPI_CFLAGS  = 
 MPI_LFLAGS  = 
 RM          = rm -f
@@ -22,10 +22,16 @@ SRCS    = main.c
 OBJS    = $(SRCS:.c=.o)
 
 # Headers for libraries
-CFLAGS     +=  -Iinclude  -I$(GSL)/include
-LDFLAGS     += -lm -lgsl -lgslcblas  -L$(GSL)/lib 
-MPI_CFLAGS +=  -I$(MPI)/include
-MPI_LFLAGS +=  -L$(MPI)/lib 
+
+ifdef $(GSL)
+	CFLAGS     +=  -I$(GSL)/include
+	LDFLAGS    +=  -L$(GSL)/lib 
+endif
+
+ifdef $(MPI)
+	MPI_CFLAGS +=  -I$(MPI)/include
+	MPI_LFLAGS +=  -L$(MPI)/lib 
+endif
 
 .PHONY: all
 all: $(EXEC)
