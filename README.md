@@ -9,26 +9,30 @@ Authors: Jean Coupon, Alexie Leauthaud, Martin Kilbinger.
 Available estimators include:
 - angular two-point correlation function (auto and cross), "w(theta)"
 - projected two-point correlation function (auto and cross), "w(R)"
-- 3D two-point correlation function, "w(rp, pi)"
-
+- galaxy-galaxy lensing, "Delta Sigma (R)"
+- 3D two-point correlation function, "xi(r)"
+- 3D two-point correlation function projected along the line of sight, "xi(rp, pi), wp(rp)"
+- weighted histogram (e.g. "VMAX" estimator of mass functions)
 
 Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly, but not limited to:
-- data storage in a binary tree,
+- data storage in binary trees,
 - approximation at large scale,
 - parellelization.
 
-Supports auto and cross correlations and galaxy-galaxy lensing
-
 Contributions:
-- The algorithm to compute the number of pairs from a tree is 
-based on Martin Kilbinger's Ahtena code:
-http://www2.iap.fr/users/kilbinge/athena/
-- The gal-gal lensing algorithm is based on
-Alexie Leauthaud's code
-(see  Leauthaud et al. (2010),  2010ApJ...709...97L).
+- The core algorithm to compute the number of pairs from a tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
+- The galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. (2010),  2010ApJ...709...97L).
 
-Usage:  mpirun -np [Ncpu] swot -c configFile [options]: run the program
+## Installation
+
+## Usage
+
+
+```
+	mpirun -np [Ncpu] swot -c configFile [options]: run the program
         swot -d: display a default configuration file
+```
+
 
 Important: if using "RADEC" coordinates, the angle
 in the input catalogues must be in decimal degrees.
