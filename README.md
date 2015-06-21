@@ -14,9 +14,9 @@ Available estimators include:
 - 3D two-point correlation function projected along the line of sight, "xi(rp, pi), wp(rp)",
 - and weighted histogram (e.g. "VMAX" estimator of mass functions).
 
-Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly (but not limited to), data storage in binary trees, approximation at large angular scale, and parellelization.
+Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly (but not limited to) data storage in binary trees, approximations at large angular scale, and parellelization.
 
-Contributions:
+Contributors:
 - the core algorithm to compute the number of pairs from a kd-tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
 - the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. (2010),  2010ApJ...709...97L).
 - the rest was written by Jean Coupon.
@@ -29,47 +29,37 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
 
-The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your local bin.
+The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your desired directory. 
 
-`SWOT` requires OPEN MPI (for paralellisation) and GSL (integration and random numbers) libraires installed on your machine. 
+`SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires installed on your machine. If OPEN MPI or GSL is installed in a different directory than `usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly.
 
-If OPEN MPI or GSL is installed in a different directory than `usr/local`, edit `Makefile` and set the `MPI` or `GSL` variable accordingly.
-
-To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), simply do:
+To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), re-install OPEN MPI with the following command:
 ``` 
 ./configure --prefix=YOUR/PATH CC=icc CXX=icpc
 ```
 
-To install GSL, please visit http://www.gnu.org/software/gsl/
-
+To download and install GSL, please visit http://www.gnu.org/software/gsl/
 
 ## Usage
 
 
+Run the software:
 ```
-	mpirun -np [Ncpu] swot -c configFile [options]: run the program
-        swot -d: display a default configuration file
+	mpirun -np [Ncpu] swot -c configFile -corr ESTIMATOR [options]: 
 ```
 
+Display the default configuration file:
+```
+    swot -d: display a default configuration file
+```
 
-Important: if using "RADEC" coordinates, the angle
+*Important*: if using "RADEC" coordinates, the angle
 in the input catalogues must be in decimal degrees.
 
--------------------------------------------------------------------------
-swot (Super W Of Theta)  mpi version                                     
--------------------------------------------------------------------------
+## Options
 
-* w(theta):
-swot -c test/auto.para [-corr cross]
 
-* Gal-gal lensing
-swot -c test/gglens.para
-
--------------------------------------------------------------------------
-Options
--------------------------------------------------------------------------
-
-* Estimator
+###  Estimator
 The choice for the estimator can be made among:
 ls: Landy & Szalay (1993) estimator (default)
 nat: Natural estimator: 1+DD/RR
