@@ -32,6 +32,19 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
 
+The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your local bin.
+
+`SWOT` requires OPEN MPI (for paralellisation) and GSL (integration and random numbers) libraires installed on your machine. 
+
+If OPEN MPI or GSL is installed in a different directory than `usr/local`, edit `Makefile` and set the `MPI` or `GSL` variable accordingly.
+
+To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), simply do:
+``` 
+./configure --prefix=YOUR/PATH CC=icc CXX=icpc
+```
+
+To install GSL, please visit http://www.gnu.org/software/gsl/
+
 
 ## Usage
 

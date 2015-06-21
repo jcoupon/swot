@@ -12,10 +12,10 @@ SRC         = main.c
 OBJ         = $(SRC:.c=.o)
 
 # Where GSL library is installed
-GSL = # /usr/local
+GSL =  #/usr/local
 
 # Where MPI is installed
-MPI = # /opt/openmpi-1.8.5/
+MPI = #/opt/openmpi-1.8.5/
 
 # source files
 SRCS    = main.c
@@ -23,12 +23,12 @@ OBJS    = $(SRCS:.c=.o)
 
 # Headers for libraries
 
-ifdef $(GSL)
+ifneq ($(GSL), ) 
 	CFLAGS     +=  -I$(GSL)/include
 	LDFLAGS    +=  -L$(GSL)/lib 
 endif
 
-ifdef $(MPI)
+ifneq ($(MPI), ) 
 	MPI_CFLAGS +=  -I$(MPI)/include
 	MPI_LFLAGS +=  -L$(MPI)/lib 
 endif
