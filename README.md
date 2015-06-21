@@ -35,7 +35,7 @@ The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variab
 
 ### Dependencies
 
-`SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires installed on your machine. If OPEN MPI or GSL is installed in a different directory than `usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly.
+`SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires. If OPEN MPI or GSL is installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly.
 
 To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), re-install OPEN MPI with the following command:
 ``` 
@@ -61,30 +61,36 @@ Display the default configuration file:
     swot -d: display a default configuration file
 ```
 
-*Important*: if using "RADEC" coordinates, the angle
-in the input catalogues must be in decimal degrees.
+*Important*: if using "RADEC" coordinates, the angle in the input catalogues must be in decimal degrees.
 
 ## Options
 
 
-###  Estimator
-The choice for the estimator can be made among:
-ls: Landy & Szalay (1993) estimator (default)
-nat: Natural estimator: 1+DD/RR
-ham: Hamilton (1993) estimator
-peebles: Peebles (1993) estimator
+###  Estimator (`corr` and `est`)
 
-* Open-angle (OA). From Athena's documentation:
-"If two nodes see each other under angles which are smaller than the open-angle
-threshold (OATH in config file), the tree is not further descended and those
-nodes are correlated directly. The mean, weighted galaxy ellipticities of the
-both nodes are multiplied, the angular separation is the binned barycenter
-distance.  This is of course very time-saving, which is the great advantage of a
-tree code over a brute-force approach. It introduces however errors in the
-correlation function, in particular on large scales, because the galaxy
-ellipticities are smeared out. One should play around with the value of OATH to
-see its influence on the results. As a guideline, OATH = 0.05 (about 3 degrees)
-can be used."
+- `auto`, `cross`: two-point correlation function. The choice for the estimator can be made among:
+`ls`: Landy & Szalay (1993) estimator (default), `nat`: natural estimator: 1+DD/RR, `ham`: Hamilton (1993), or `peebles`: Peebles (1993).
+- `gglens`
+- `auto_wp`, `cross_wp`
+- `auto_3D`, `cross_3D`
+- `number`
+
+
+### Open angle (`OA`)
+
+From Athena's documentation:
+	"If two nodes see each other under angles which are smaller than the open-angle
+	threshold (OATH in config file), the tree is not further descended and those
+	nodes are correlated directly. The mean, weighted galaxy ellipticities of the
+	both nodes are multiplied, the angular separation is the binned barycenter
+	distance.  This is of course very time-saving, which is the great advantage of a
+	tree code over a brute-force approach. It introduces however errors in the
+	correlation function, in particular on large scales, because the galaxy
+	ellipticities are smeared out. One should play around with the value of OATH to
+	see its influence on the results. As a guideline, OATH = 0.05 (about 3 degrees)
+	can be used."
+
+### Input format (ascii files)
 
 * default input format for "number" [-weighted]
 RA DEC X [weight]
