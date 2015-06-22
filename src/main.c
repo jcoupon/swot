@@ -42,8 +42,9 @@
  * Version history
  *
  * v 1.0.0 [Jean]
- * - added printTree in autoCorr (TO DO add it everywhere)
- * - added nsub for bootrap (but limited to 256, TO DO creat option to increase limit)
+ * - added printTree in autoCorr (TO DO add it also for gg lens )
+ * - added nsub for bootstrap for cross and auto estimators
+ * - added -printSamples yes
  *
  * v 0.48 [Jean]
  * - bug corrected for -RR_in and RR_out
