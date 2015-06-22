@@ -41,6 +41,10 @@
  *
  * Version history
  *
+ * v 1.0.0 [Jean]
+ * - added printTree in autoCorr (TO DO add it everywhere)
+ * - added nsub for bootrap (but limited to 256, TO DO creat option to increase limit)
+ *
  * v 0.48 [Jean]
  * - bug corrected for -RR_in and RR_out
  *
@@ -402,7 +406,7 @@ void autoCorr(Config para){
   /* resample, build masks */
   comment(para, "Resampling...");
   resample(&para, &random, dimStart, &mask, FIRSTCALL);
-  
+
   /* send data */
   comment(para, "sending data...");  
   comData(para, &random, 0, dimStart, FIRSTCALL);
@@ -412,21 +416,20 @@ void autoCorr(Config para){
   comment(para, "building trees...");
   randomTree = buildTree(&para, &random, &mask, dimStart, FIRSTCALL);   freePoint(para, random);
   dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
-  
   comment(para, "done.\n");
-  
+
   /* divide and conquer */
   long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
   long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
+  
+  if(para.rank == 0 && para.printTree){
+    char fileTreeName[1000];
+    strcpy(fileTreeName, para.fileOutName);
+    printTree(para, strcat(fileTreeName, ".tree"), dataTree, ROOT, 1, FIRSTCALL);
+    //exit(-1);
+  }
 
   
-  /* DEBUGGING */
-  /*
-     if(para.rank == MASTER){
-     printTree(para, para.fileOutName, dataTree, ROOT, 1, FIRSTCALL);
-     exit(-1);
-     }
-  */
   /* compute pairs */
   switch (para.corr){
   case AUTO: case AUTO_3D:
@@ -453,7 +456,6 @@ void autoCorr(Config para){
   if (!strcmp(para.RRInFileName, "")){
     comResult(para, RR, para.size, 0);
   }
-
   comResult(para, DR, para.size, 0);
   comResult(para, DD, para.size, 0);
   
@@ -530,10 +532,12 @@ void autoCorr(Config para){
 	if(sum > 0.0) meanR[i] = DD.meanR[i]/sum;
       }
     }
-    
-    /* Errors  ------------------------------------------------------------------------ */
+
+
     
 
+    
+    /* Errors  ------------------------------------------------------------------------ */
     /* mean w(theta) and errors */
     double *wmean = (double *)malloc(para.nbins*sizeof(double));
     double *err_r = (double *)malloc(para.nbins*sizeof(double));
@@ -1529,6 +1533,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
     for(l=0;l<para->nsamples;l++){
       result.N1[l+1] = tree1->Ntot[l];
       result.N2[l+1] = tree2->Ntot[l];
+    
     }
   }
   
@@ -1953,7 +1958,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     
     /* number of nodes */
     result.size = countNodes(data->N, NLEAF);
-    
+   
     /* allocate memory slots (see structure description in main.h)*/
     result.left   = (long *)malloc(result.size*sizeof(long)); 
     result.right  = (long *)malloc(result.size*sizeof(long)); 
@@ -1989,7 +1994,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   int ndim;
   if(para->resample2D) ndim = 2;
   else ndim = NDIM;
-  for(j=0;j<para->nsamples;j++){  /* loop over subsamples */
+  for(j=0;j<para->nsub;j++){  /* loop over subsamples */
     n = 0;
     for(i=0;i<ndim;i++){
       n += (mask->min[ndim*j + i] < result.point.x[NDIM*local_index + i] &&
@@ -2077,7 +2082,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
   
   /* return the index of this node (index is static) */
   index = local_index;
-  
+
   return result;
 }
 
@@ -2127,21 +2132,25 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
 	  fprintf(stderr,"\n%s: **ERROR** nsub must be < Npoints. Exiting...\n", MYNAME);
 	exit(EXIT_FAILURE);
       }
-      
-      for(i=0;i<para->nsamples*para->nsub;i++) mask->w[i] = 0;
 
+      for(i=0;i<para->nsamples*para->nsub;i++) mask->w[i] = 0;
+      
       for(i=0;i<para->nsamples;i++){
 	for(j=0;j<para->nsub;j++){
 	  /* i: resample draw index
 	   * j: subsample index
 	   */
 	  switch(para->err){
-	  case SUBSAMPLE: mask->w[para->nsub*i + j] = (i == j);                 break;
-	  case JACKKNIFE: mask->w[para->nsub*i + j] = !(i == j);                break;
+	  case SUBSAMPLE: mask->w[para->nsub*i + j] = (i == j);             break;
+	  case JACKKNIFE: mask->w[para->nsub*i + j] = !(i == j);            break;
 	  case BOOTSTRAP: mask->w[para->nsub*i + randInt(para->nsub)] += 1; break;
 	  }
 	}
       }
+
+
+     
+      
     }
   }
   
@@ -2214,7 +2223,12 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
   }else{
     for(dim=0;dim<NDIM;dim++)   fprintf(fileOut,"%f ", tree.point.x[NDIM*i+dim]);
     for(l=0;l<para.nsamples;l++)  fprintf(fileOut,"%d ", tree.w[para.nsamples*i + l] );
-    fprintf(fileOut,"     %d \n", para.rank);
+    //fprintf(fileOut,"     %d \n", para.rank);
+
+
+    // DEBUGGING
+
+    fprintf(fileOut,"     %d \n", 0);
   }
   
   //if(firstCall)  MPI_Barrier(MPI_COMM_WORLD);
@@ -2641,6 +2655,9 @@ void initPara(int argc, char **argv, Config *para){
   strcpy(para->fileOutName,   "corr.out");
   para->calib      = 0;
   para->resample2D = 0;
+  para->printTree  = 0;
+  para->seed       = -1;
+
   
   /* only master talks */
   if(para->rank == MASTER){
@@ -2663,7 +2680,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 0.48\n\n\
+                (Super W Of Theta) MPI version 1.0.0\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2701,6 +2718,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("                         # or [bootstrap2D,jackknife2D]\n");
       printf("nsub           %d\t # Number of subvolumes for resampling (power of 2)\n", para->nsamples);
       printf("nsamples       %d\t # Number of samples for resampling (= nsub for jackknife)\n", para->nsub);
+      printf("seed           %ld\t # random seed for bootstrap\n", para->seed);
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
       printf("RR_in          no\t # file for pre-computed RR pairs (only for clustering) \n");
@@ -2722,6 +2740,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("out            %s\t # Output file\n", para->fileOutName);
       printf("cov            no\t # Covariance matrix of errors [yes,no] (in \"out\".cov)\n");
       printf("xi             no\t # xi(rp, pi) for auto_wp [yes,no] (in \"out\".xi)\n");
+      printf("printTree      no\t # Ouput tree in \"out\".tree\n");
       exit(EXIT_FAILURE);
     }
   }
@@ -2755,6 +2774,16 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   
   /* ----------------------------------------------------------------------
    * STEP 4: readjust parameters if needed */
+  
+  /* Random seed */
+  if(para->rank == MASTER && para->seed > 0){
+    srand((unsigned int)para->seed);
+    /*
+      Debugging
+      printf("setting new seed...%ld.", para->seed);
+      printf(" ran = %d\n", rand());
+    */
+  }
   
   /* Default projection for gg lensing and wp */
   if( (para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP) && para->proj == THETA ){
@@ -2919,6 +2948,9 @@ void setPara(char *field, char *arg, Config *para){
   }else if(!strcmp(field,"nsamples")){
     checkArg(field,arg,para);
     para->nsamples = atoi(arg);
+  }else if(!strcmp(field,"seed")){
+    checkArg(field,arg,para);
+    para->seed = atoi(arg);
   }else if(!strcmp(field,"nsub")){
     checkArg(field,arg,para);
     para->nsub = atoi(arg);
@@ -2958,6 +2990,10 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     if(!strcmp(arg,"yes")) para->xi = 1;
     else para->xi = 0;
+  }else if(!strcmp(field,"printTree")){
+    checkArg(field,arg,para);
+    if(!strcmp(arg,"yes")) para->printTree = 1;
+    else para->printTree = 0;
   }else if(!strcmp(field,"RR_in")){
     checkArg(field,arg,para);
     if(strcmp(arg,"no")){
@@ -3418,6 +3454,9 @@ double determineMachineEpsilon(){
 
 long randInt(long N){
   /* Returns an random integer between 0 and N-1. */
+
+  
+  
   return (long)((double)rand()/((double)RAND_MAX + 1)*N);
 }
 
@@ -3434,6 +3473,7 @@ void comment(const Config para, char *commentString){
   if(para.verbose){
     fflush(stderr); 
     fprintf(stderr, "%s", commentString);
+    fflush(stderr); 
   }
   return;
 }

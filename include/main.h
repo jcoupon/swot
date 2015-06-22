@@ -184,6 +184,13 @@ typedef struct Config
   
   /* error method JACKKNIFE or BOOTSTRAP */
   int err, nsamples, nsub;
+
+  /* Print tree */
+  int printTree;
+
+  /* seed */
+  size_t seed;
+
   
   /* cosmology */
   double a[4];

@@ -1,21 +1,26 @@
 # Makefile for swot
 
+# Where GSL library is installed
+GSL =  #/usr/local
+
+# Where MPI is installed
+MPI = #/opt/openmpi-1.8.6_clang
+
 # compiler options
-MPICC       = mpicc
-CFLAGS      = -Iinclude# -use-asm # for old icc versions
-LDFLAGS     = -lm -lgsl -lgslcblas
+ifneq ($(MPI), ) 
+	MPICC       = $(MPI)/bin/mpicc
+else
+	MPICC       = mpicc
+endif
+
+CFLAGS      = -Iinclude # -use-asm # for old icc versions
+LDFLAGS     =  -lgsl -lgslcblas -lm
 MPI_CFLAGS  = 
 MPI_LFLAGS  = 
 RM          = rm -f
 EXEC        = bin/swot
 SRC         = main.c
 OBJ         = $(SRC:.c=.o)
-
-# Where GSL library is installed
-GSL =  #/usr/local
-
-# Where MPI is installed
-MPI = #/opt/openmpi-1.8.5/
 
 # source files
 SRCS    = main.c
