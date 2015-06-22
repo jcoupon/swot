@@ -261,12 +261,12 @@ void numberCount(Config para){
   comment(para, "building trees...");
   dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
   comment(para, "done.\n");  
-  
-  /* DEBUGGING
-     if(para.rank == MASTER){
-     printTree(para, "tree.out", dataTree, ROOT, 1, FIRSTCALL);
-     }
-  */
+
+  /* Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
+  if(para.rank == 0 && para.printTree){
+    sprintf(fileOutName, "%s.data.tree", para.fileOutName);
+    printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+  }
   
   /* divide and conquer */
   long nodeSlaveData = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
@@ -336,16 +336,26 @@ void numberCount(Config para){
     fileOut = fopen(para.fileOutName, "w");    
     fprintf(fileOut, "# Number counts.\n");       
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples).\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples).\n", para.nsamples); break;
-    case SUBSAMPLE: fprintf(fileOut, "# Resampling: subsample (%d samples).\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
+    case SUBSAMPLE: fprintf(fileOut, "# Resampling: subsample (%d samples [=subvolumes]).\n", para.nsamples); break;
     }
     fprintf(fileOut, "#  x            N(x)    err(resamp) err(resamp-poisson) err(poisson)      <R>\n");
     for(i=0;i<para.nbins;i++){
       fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f\n",  R[i], N.NN[i], err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i]);
     }
     fclose(fileOut);
-   
+
+    /* write samples */
+    if(para.printSamples){
+      sprintf(fileOutName, "%s.samples", para.fileOutName);
+
+      /* To do */
+
+
+    }
+
+    
     /* write file out covariance matrix -------------------------------------------------------------- */
     if(para.cov_mat){ 
       double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
@@ -422,14 +432,12 @@ void autoCorr(Config para){
   long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
   long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
   
+  /* Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
   if(para.rank == 0 && para.printTree){
-    char fileTreeName[1000];
-    strcpy(fileTreeName, para.fileOutName);
-    printTree(para, strcat(fileTreeName, ".tree"), dataTree, ROOT, 1, FIRSTCALL);
-    //exit(-1);
+    sprintf(fileOutName, "%s.data.tree", para.fileOutName);
+    printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
   }
 
-  
   /* compute pairs */
   switch (para.corr){
   case AUTO: case AUTO_3D:
@@ -509,9 +517,6 @@ void autoCorr(Config para){
     }
   }
   
-
-
-  
   /* print out results */
   if(para.rank == MASTER){
     
@@ -533,8 +538,6 @@ void autoCorr(Config para){
       }
     }
 
-
-    
 
     
     /* Errors  ------------------------------------------------------------------------ */
@@ -615,8 +618,8 @@ void autoCorr(Config para){
     case PEEBLES: fprintf(fileOut, "# Auto-correlation, Peebles estimator.\n");       break;
     }
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples).\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples).\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
     }
     switch(para.corr){
       /* If auto correlation  ------------------------------------------------------------------------ */
@@ -683,6 +686,46 @@ void autoCorr(Config para){
       }
       fclose(fileOut);
     }
+
+    /* write samples */
+    if(para.printSamples){
+      sprintf(fileOutName, "%s.samples", para.fileOutName);
+      fileOut = fopen(fileOutName, "w");
+
+      /* Print resampling method */
+      switch(para.err){
+      case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+      case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
+      }
+      
+      /* Print bin values */
+      fprintf(fileOut, "#");
+      for(i=0;i<para.nbins;i++){
+	fprintf( fileOut, "%12.7f ", R[i]);
+      }
+      fprintf(fileOut, "\n");
+      
+      switch(para.corr){
+      case AUTO: case AUTO_3D:
+	for(l=0;l<para.nsamples;l++){
+	  for(i=0;i<para.nbins;i++){
+	    fprintf(fileOut, "%12.7f ", wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1) );
+	  }
+	  fprintf(fileOut, "\n");
+	}
+	break;
+      case AUTO_WP:
+	for(l=0;l<para.nsamples;l++){
+	  for(i=0;i<para.nbins;i++){
+	    fprintf(fileOut, "%12.7f ", wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1) );
+	  }
+	  fprintf(fileOut, "\n");
+	}
+	break;
+      }
+      fclose(fileOut);
+    }
+   
     
     /* write file out covariance matrix -------------------------------------------------------------- */
     if(para.cov_mat){ 
@@ -788,8 +831,17 @@ void crossCorr(Config para){
   randomTree2 = buildTree(&para, &random2, &mask, dimStart, FIRSTCALL);   freePoint(para, random2);
   dataTree1   = buildTree(&para, &data1, &mask, dimStart, FIRSTCALL);     freePoint(para, data1);
   dataTree2   = buildTree(&para, &data2, &mask, dimStart, FIRSTCALL);     freePoint(para, data2);
-  
   comment(para, "done.\n");                    
+
+  /* Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
+  if(para.rank == 0 && para.printTree){
+
+    sprintf(fileOutName, "%s.data1.tree", para.fileOutName);
+    printTree(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
+
+    sprintf(fileOutName, "%s.data2.tree", para.fileOutName);
+    printTree(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
+  }
   
   /* divide and conquer */
   long nodeSlaveRan1  = splitTree(&para, &randomTree1, ROOT, para.size, FIRSTCALL);
@@ -978,8 +1030,8 @@ void crossCorr(Config para){
     case PEEBLES: fprintf(fileOut, "# Cross-correlation, Peebles estimator.\n");       break;
     }
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples)\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples)\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
     }
     switch(para.corr){
       /* If cross correlation  ------------------------------------------------------------------------ */
@@ -1046,6 +1098,51 @@ void crossCorr(Config para){
       }
       fclose(fileOut);
     }
+
+
+     /* write samples */
+    if(para.printSamples){
+      sprintf(fileOutName, "%s.samples", para.fileOutName);
+      fileOut = fopen(fileOutName, "w");
+
+      /* Print resampling method */
+      switch(para.err){
+      case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+      case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
+      }
+      
+      /* Print bin values */
+      fprintf(fileOut, "#");
+      for(i=0;i<para.nbins;i++){
+	fprintf( fileOut, "%12.7f ", R[i]);
+      }
+      fprintf(fileOut, "\n");
+      
+      switch(para.corr){
+      case CROSS: case CROSS_3D:
+	for(l=0;l<para.nsamples;l++){
+	  for(i=0;i<para.nbins;i++){
+	    fprintf(fileOut, "%12.7f ", wTheta(para, para.estimator, D1D2, R1R2, D1R1, D2R2, i, l+1) );
+	  }
+	  fprintf(fileOut, "\n");
+	}
+	break;
+      case CROSS_WP:
+	for(l=0;l<para.nsamples;l++){
+	  for(i=0;i<para.nbins;i++){
+	    fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R1, D2R2, -1, i, l+1) );
+	  }
+	  fprintf(fileOut, "\n");
+	}
+	break;
+      }
+
+      fclose(fileOut);
+    }
+
+    
+
+    
     
     /* write file out covariance matrix -------------------------------------------------------------- */
     if(para.cov_mat){ 
@@ -1132,12 +1229,10 @@ void ggCorr(Config para){
   sourceTree = buildTree(&para, &source, &mask, dimStart, FIRSTCALL);   freePoint(para, source);
   lensTree   = buildTree(&para, &lens,   &mask, dimStart, FIRSTCALL);   freePoint(para, lens);
   
-  
-  /* DEBUGGING THIS DOES NOT WORK - check printTree for gg lensing
-  if(para.rank == MASTER){
-    printTree(para, "tree.out", sourceTree, ROOT, 1, FIRSTCALL);
+  /* TO FIX */
+  if(para.rank == 0 && para.printTree){
+    if(para.verbose) fprintf(stderr,"\n%s: **WARNING** printTree not supported for gglens.\n", MYNAME);
   }
-  */
   
   comment(para, "done.\n");
   comment(para, "Correlating lenses with sources...       ");
@@ -1178,8 +1273,8 @@ void ggCorr(Config para){
     fileOut = fopen(para.fileOutName,"w");
     fprintf(fileOut, "# Gal-gal lensing. Delta_Sigma(R) vs R, linear approximation\n");
     switch(para.err){
-    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples)\n", para.nsamples); break;
-    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d samples)\n", para.nsamples); break;
+    case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+    case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
     }
     switch(para.proj){
     case PHYS:  fprintf(fileOut, "# Coordinates: physical\n"); break;
@@ -1218,8 +1313,21 @@ void ggCorr(Config para){
 		R, 0.0,	0.0, 0.0, (long)result.Nsources[i], R, 0.0);
       }
     }
-    
     fclose(fileOut);
+
+    if(para.printSamples){
+
+      /*
+      sprintf(fileOutName, "%s.samples", para.fileOutName);
+      fileOut = fopen(fileOutName, "w");
+      
+
+      fclose(fileOut);
+      */
+
+      // TO DO
+   }
+
     
     /* covariance matrix */
     if(para.cov_mat){ 
@@ -1787,7 +1895,7 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
     printCount(count, total, 10000, para->verbose);
   }
   
-  if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n",100.0); 
+  if(firstCall && para->verbose) fprintf(stderr, "\b\b\b\b\b\b\b%6.2f%%\n",100.0);
   
   return result;
 }
@@ -1964,7 +2072,7 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
     result.right  = (long *)malloc(result.size*sizeof(long)); 
     result.N      = (double *)malloc(result.size*sizeof(double)); 
     result.r      = (double *)malloc(result.size*sizeof(double));
-    result.w      = (SAMPLE_TYPE *)malloc(result.size*para->nsamples*sizeof(SAMPLE_TYPE));
+    result.w      = (unsigned char *)malloc(result.size*para->nsamples*sizeof(unsigned char));
     result.Ntot   = (double *)malloc(para->nsamples*sizeof(double));
     result.point  = createPoint(*para, result.size);
     if(para->corr != AUTO_3D && para->corr != CROSS_3D){
@@ -2108,11 +2216,13 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
     /* check up sample values value and evaluate depthSample */
     if(para->nsamples == 0){
       return;
-    }else if(para->nsamples > SAMPLE_MAX || para->nsub > SAMPLE_MAX){
+      /*
+    }else if(para->nsamples > 256 || para->nsub > 256){
       if(para->verbose) 
 	fprintf(stderr,"\n%s: **ERROR** nsamplesand nsub must be <= 256. Exiting...\n", MYNAME);
       MPI_Finalize();
       exit(EXIT_FAILURE);
+      */
     }else if(lowestPowerOfTwo(para->nsub, &depthSample) != para->nsub){
       if(para->verbose)
 	fprintf(stderr,"\n%s: **ERROR** nsub must be a power of 2. Exiting...\n", MYNAME);
@@ -2123,7 +2233,7 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
     /* initialisation */
     mask->min = (double *)malloc(ndim*para->nsub*sizeof(double));  
     mask->max = (double *)malloc(ndim*para->nsub*sizeof(double));  
-    mask->w   = (SAMPLE_TYPE *)malloc(para->nsamples*para->nsub*sizeof(SAMPLE_TYPE));
+    mask->w   = (unsigned char *)malloc(para->nsamples*para->nsub*sizeof(unsigned char));
     
     if(para->rank == MASTER){
       
@@ -2147,9 +2257,15 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
 	  }
 	}
       }
-
-
-     
+      
+      /* make sure no mask value is larger than 256 */
+      for(i=0;i<para->nsamples*para->nsub;i++){
+	if(mask->w[i]  > 255){
+	  if(para->verbose) 
+	    fprintf(stderr,"\n%s: **ERROR** a mask value > 255 was produced, stack overflow will occur. Exiting...\n", MYNAME);
+	  exit(EXIT_FAILURE);
+	}
+      }
       
     }
   }
@@ -2194,7 +2310,7 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
   if(firstCall){
     MPI_Bcast(mask->min, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
     MPI_Bcast(mask->max, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
-    MPI_Bcast(mask->w,   para->nsamples*para->nsub, MPI_SAMPLE_TYPE, MASTER, MPI_COMM_WORLD);
+    MPI_Bcast(mask->w,   para->nsamples*para->nsub, MPI_UNSIGNED_CHAR, MASTER, MPI_COMM_WORLD);
   }
   
   return;
@@ -2223,16 +2339,10 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
   }else{
     for(dim=0;dim<NDIM;dim++)   fprintf(fileOut,"%f ", tree.point.x[NDIM*i+dim]);
     for(l=0;l<para.nsamples;l++)  fprintf(fileOut,"%d ", tree.w[para.nsamples*i + l] );
-    //fprintf(fileOut,"     %d \n", para.rank);
-
-
-    // DEBUGGING
-
-    fprintf(fileOut,"     %d \n", 0);
+    fprintf(fileOut,"     %d \n", para.rank);
   }
   
   //if(firstCall)  MPI_Barrier(MPI_COMM_WORLD);
- 
 }
 
 void freeTree(const Config para, Tree tree){
@@ -2633,30 +2743,31 @@ void initPara(int argc, char **argv, Config *para){
     para->ran1Id[i]  = i+1;
     para->ran2Id[i]  = i+1;
   }
-  NDIM            = 2; /* number of dimensions, 2 or 3 */
-  para->distAng   = &distAngSpher;
-  para->proj      = THETA;
-  para->corr      = AUTO;
-  para->estimator = LS;
-  para->min       = 0.0001;
-  para->max       = 1.0;
-  para->nbins     = 20;
-  para->nbins_pi  = 100;
-  para->log       = 1;
-  para->OA        = 0.05;
-  para->nsub      = 32;
-  para->nsamples  = para->nsub;
-  para->err       = JACKKNIFE;
-  para->cov_mat   = 0;
-  para->xi        = 0;
-  para->deltaz    = 0.03;
-  para->pi_max    = 40.0;
-  para->weighted  = 0;
+  NDIM              = 2; /* number of dimensions, 2 or 3 */
+  para->distAng     = &distAngSpher;
+  para->proj        = THETA;
+  para->corr        = AUTO;
+  para->estimator   = LS;
+  para->min         = 0.0001;
+  para->max         = 1.0;
+  para->nbins       = 20;
+  para->nbins_pi    = 100;
+  para->log         = 1;
+  para->OA          = 0.05;
+  para->nsub        = 32;
+  para->nsamples    = para->nsub;
+  para->err         = JACKKNIFE;
+  para->cov_mat     = 0;
+  para->xi          = 0;
+  para->deltaz      = 0.03;
+  para->pi_max      = 40.0;
+  para->weighted    = 0;
   strcpy(para->fileOutName,   "corr.out");
-  para->calib      = 0;
-  para->resample2D = 0;
-  para->printTree  = 0;
-  para->seed       = -1;
+  para->calib       = 0;
+  para->resample2D  = 0;
+  para->printTree   = 0;
+  para->seed         = -1;
+  para->printSamples = 0;
 
   
   /* only master talks */
@@ -2741,6 +2852,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("cov            no\t # Covariance matrix of errors [yes,no] (in \"out\".cov)\n");
       printf("xi             no\t # xi(rp, pi) for auto_wp [yes,no] (in \"out\".xi)\n");
       printf("printTree      no\t # Ouput tree in \"out\".tree\n");
+      printf("printSamples   no\t # Ouput samples in \"out\".samples\n");
       exit(EXIT_FAILURE);
     }
   }
@@ -2994,6 +3106,10 @@ void setPara(char *field, char *arg, Config *para){
     checkArg(field,arg,para);
     if(!strcmp(arg,"yes")) para->printTree = 1;
     else para->printTree = 0;
+  }else if(!strcmp(field,"printSamples")){
+    checkArg(field,arg,para);
+    if(!strcmp(arg,"yes")) para->printSamples = 1;
+    else para->printSamples = 0;
   }else if(!strcmp(field,"RR_in")){
     checkArg(field,arg,para);
     if(strcmp(arg,"no")){

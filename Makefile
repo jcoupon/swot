@@ -45,7 +45,7 @@ vpath %.h include
 vpath %.c src
 
 $(EXEC):  $(OBJS)
-	$(MPICC) $(CFLAGS) $(LDFLAGS) $(MPI_CFLAGS) $(MPI_LFLAGS) -o $@ $^
+	$(MPICC)  -o $@ $^ $(CFLAGS) $(LDFLAGS) $(MPI_CFLAGS) $(MPI_LFLAGS) 
 
 %.o:  %.c 
 	$(MPICC) -c -o $@ $< $(CFLAGS) $(MPI_CFLAGS)
