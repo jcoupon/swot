@@ -437,6 +437,7 @@ void autoCorr(Config para){
   if(para.rank == 0 && para.printTree){
     sprintf(fileOutName, "%s.data.tree", para.fileOutName);
     printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+    //exit(-1);
   }
 
   /* compute pairs */
@@ -2342,6 +2343,8 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
     for(l=0;l<para.nsamples;l++)  fprintf(fileOut,"%d ", tree.w[para.nsamples*i + l] );
     fprintf(fileOut,"     %d \n", para.rank);
   }
+  
+  if(firstCall) fclose(fileOut);
   
   //if(firstCall)  MPI_Barrier(MPI_COMM_WORLD);
 }
