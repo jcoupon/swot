@@ -41,6 +41,9 @@
  *
  * Version history
  *
+ * v 1.0.1 [Jean]
+ * - small bug corrected in config file
+ *
  * v 1.0.0 [Jean]
  * - added printTree in autoCorr (TO DO add it also for gg lens )
  * - added nsub for bootstrap for cross and auto estimators
@@ -2795,7 +2798,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.0.0\n\n\
+                (Super W Of Theta) MPI version 1.0.1\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2833,7 +2836,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       printf("                         # or [bootstrap2D,jackknife2D]\n");
       printf("nsub           %d\t # Number of subvolumes for resampling (power of 2)\n", para->nsamples);
       printf("nsamples       %d\t # Number of samples for resampling (= nsub for jackknife)\n", para->nsub);
-      printf("seed           %ld\t # random seed for bootstrap\n", para->seed);
+      printf("seed           time\t # random seed for bootstrap\n");
       printf("OA             %g\t # Open angle for approximation (value or \"no\") \n", para->OA);
       printf("calib          no\t # Calibration factor [yes,no] (for lensing). Replace e1 by 1+m or c.\n");
       printf("RR_in          no\t # file for pre-computed RR pairs (only for clustering) \n");
@@ -3066,7 +3069,9 @@ void setPara(char *field, char *arg, Config *para){
     para->nsamples = atoi(arg);
   }else if(!strcmp(field,"seed")){
     checkArg(field,arg,para);
-    para->seed = atoi(arg);
+    if(strcmp(arg,"time")){
+      para->seed = atoi(arg);
+    }
   }else if(!strcmp(field,"nsub")){
     checkArg(field,arg,para);
     para->nsub = atoi(arg);
