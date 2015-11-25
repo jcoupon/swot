@@ -266,7 +266,7 @@ void numberCount(Config para){
   dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
   comment(para, "done.\n");
 
-  /* Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
+  /* Output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
   if(para.rank == 0 && para.printTree){
     sprintf(fileOutName, "%s.data.tree", para.fileOutName);
     printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
@@ -407,7 +407,6 @@ void autoCorr(Config para){
   Mask mask;
   char  fileOutName[1000];
   FILE *fileOut, *fileRR;
-
 
   /* read files */
   if(para.rank == MASTER){
@@ -1649,6 +1648,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
     }
 
     total = tree1->N[i]*tree2->N[j];
+
     /* number of points (used in wTheta(...) for the normalization) */
     result.N1 = (double *)malloc((para->nsamples+1)*sizeof(double));
     result.N2 = (double *)malloc((para->nsamples+1)*sizeof(double));
@@ -2396,6 +2396,7 @@ long splitTree(const Config *para, const Tree *tree1, const long root, const lon
   if(firstCall){
       count = rootRank = 0;
    }
+
 
   if(Ncpu > 1){
     switch(PARITY(Ncpu)){
