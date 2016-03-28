@@ -42,7 +42,7 @@
  * Version history
  *
  * v 1.0.2 [Jean]
- * - proj set to theta if 3D correlation
+ * - proj automatically set to theta if 3D correlation
  *
  * v 1.0.1 [Jean]
  * - small bug corrected in config file
