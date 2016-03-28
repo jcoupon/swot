@@ -41,6 +41,9 @@
  *
  * Version history
  *
+ * v 1.0.2 [Jean]
+ * - proj set to theta if 3D correlation
+ *
  * v 1.0.1 [Jean]
  * - small bug corrected in config file
  *
@@ -2003,7 +2006,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
       double e1         =  e1_source*cos2phi_gg + e2_source*sin2phi_gg;
       double e2         = -e1_source*sin2phi_gg + e2_source*cos2phi_gg;
 
-      GG  = e1*w/SigCritInv;
+      GG = e1*w/SigCritInv;
       WW = w;
 
       result.e2[k] += e2*w/SigCritInv;
@@ -2815,7 +2818,7 @@ void initPara(int argc, char **argv, Config *para){
       if(para->verbose){
       fprintf(stderr,"\n\n\
                           S W O T\n\n\
-                (Super W Of Theta) MPI version 1.0.1\n\n\
+                (Super W Of Theta) MPI version 1.0.2\n\n\
 Program to compute two-point correlation functions.\n\
 Usage:  %s -c configFile [options]: run the program\n\
         %s -d: display a default configuration file\n\
@@ -2933,6 +2936,12 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
   if(para->corr == NUMBER || para->corr == AUTO_WP || para->corr == CROSS_WP){
     NDIM  = 3;
     para->resample2D = 1;
+  }
+
+  /* for 3D computation, no projection is used (-> proj=THETA) */
+  if((para->proj == COMO || para->proj == PHYS) && (para->corr == AUTO_3D || para->corr == CROSS_3D)){
+     para->proj = THETA;
+     if(para->verbose) fprintf(stderr,"\n%s: **WARNING** proj set to theta for 3D correlation.\n", MYNAME);
   }
 
   /* If jackknife nsub != nsamples and check that nsamples >= nsub otherwise */
