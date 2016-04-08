@@ -38,7 +38,7 @@ The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variab
 `SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires. If OPEN MPI or GSL is installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly.
 
 To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), re-install OPEN MPI with the following command:
-``` 
+```
 ./configure --prefix=YOUR/PATH CC=icc CXX=icpc
 ```
 
@@ -53,7 +53,7 @@ To download and install GSL, please visit http://www.gnu.org/software/gsl/
 
 Run the software:
 ```
-	mpirun -np [Ncpu] swot -c configFile -corr ESTIMATOR [options]: 
+	mpirun -np [Ncpu] swot -c configFile -corr ESTIMATOR [options]:
 ```
 
 Display the default configuration file:
@@ -95,7 +95,7 @@ From Athena's documentation:
 
 Notes:
 
-`-weighted`: compute weighted quantities ([X]: column for the weights if available).
+`-weighted`: compute weighted quantities ([X]: column for the weights if available). WARNING: if set, all input files must contain a weight column (including the random samples, put 1.0's if no weight).
 
 * default input format for `number` `RA DEC m [weight]`: change column ids with: `-cols1 1,2,3[,4]`, with `m` the quantity to compute the histogram for. Positions on the sky are required for the computation of sky-based resampling errors.
 
@@ -130,5 +130,3 @@ by automatically forking the project and prompting to send a pull request too.
 [fork]: http://help.github.com/forking/
 [branch]: https://help.github.com/articles/creating-and-deleting-branches-within-your-repository
 [pr]: http://help.github.com/pull-requests/
-
-
