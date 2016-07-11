@@ -37,7 +37,7 @@
 *
 * Version history
 *
-* v 1.1.1 [Jean]
+* v 1.1.2 [Jean]
 * - replaced D1R1 and D2R2 in LS, Hamilton and Peebles
 * estimator upon Elinor Medezinski's suggestion
 *
@@ -1409,11 +1409,16 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
    /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
 
    /* initialization */
-   double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
-   double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
-   double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+   // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
+   // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
+   // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+   double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]))/(D1D2.N1[l]*(D1D2.N2[l]));
+   double Norm2 = (R1R2.N1[l])/D1D2.N1[l];
+   double Norm3 = (R1R2.N2[l])/D1D2.N2[l];
+
    double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
    double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
+
 
    double result = 0.0;
 
@@ -1450,9 +1455,14 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
       double R;
 
       /* initialization */
-      double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
-      double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
-      double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+      // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
+      // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
+      // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+      double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]))/(D1D2.N1[l]*(D1D2.N2[l]));
+      double Norm2 = (R1R2.N1[l])/D1D2.N1[l];
+      double Norm3 = (R1R2.N2[l])/D1D2.N2[l];
+
+
       double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
       double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
 
@@ -1533,9 +1543,15 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
       /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
 
       /* initialization */
-      double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
-      double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
-      double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+      // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
+      // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
+      // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+      double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]))/(D1D2.N1[l]*(D1D2.N2[l]));
+      double Norm2 = (R1R2.N1[l])/D1D2.N1[l];
+      double Norm3 = (R1R2.N2[l])/D1D2.N2[l];
+
+
+
       double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
       double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
 
@@ -2851,7 +2867,7 @@ void initPara(int argc, char **argv, Config *para){
          if(para->verbose){
             fprintf(stderr,"\n\n\
             S W O T\n\n\
-            (Super W Of Theta) MPI version 1.1.1\n\n\
+            (Super W Of Theta) MPI version 1.1.2\n\n\
             Program to compute two-point correlation functions.\n\
             Usage:  %s -c configFile [options]: run the program\n\
             %s -d: display a default configuration file\n\
