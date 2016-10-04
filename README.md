@@ -1,6 +1,7 @@
 # swot (Super W Of Theta)
 
-Authors: Jean Coupon, Alexie Leauthaud, Martin Kilbinger.
+Author: Jean Coupon
+Contributors: Alexie Leauthaud, Martin Kilbinger, Elinor Medezinski.
 
 ## Description
 
@@ -16,14 +17,25 @@ Available estimators include:
 
 Each estimator is wrapped around a set of "divide and conquer" algorithms, mainly (but not limited to) data storage in binary trees, approximations at large angular scale, and parellelization.
 
-Contributors:
-- the core algorithm to compute the number of pairs from a kd-tree is based on Martin Kilbinger's Ahtena code: http://www.cosmostat.org/software/athena/
+Contributions:
+- the core algorithm to compute the number of pairs from a kd-tree is based on Martin Kilbinger's Athena code: http://www.cosmostat.org/software/athena/.
 - the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. 2010, ApJ, 709, 97).
-- the rest was written by Jean Coupon.
+- Elinor Medezinski helped improving and correcting a number of bugs in the cross-correlation module.
 
-If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
+If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5): http://adsabs.harvard.edu/abs/2012A%26A...542A...5C. A static link is also available at http://jeancoupon.com/swot.
 
 ## Installation
+
+### Dependencies
+
+`SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires.
+
+To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), install OPEN MPI with the following command:
+```
+./configure --prefix=YOUR/PATH CC=icc CXX=icpc
+```
+
+To download and install GSL, please visit http://www.gnu.org/software/gsl/
 
 ### SWOT
 
@@ -31,18 +43,12 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5).
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
 
+If OPEN MPI or GSL are installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly, or run:
+```
+make GSL=path/to/gsl MPI=path/to/mpi
+```
+
 The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your working directory.
-
-### Dependencies
-
-`SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires. If OPEN MPI or GSL is installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly.
-
-To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), re-install OPEN MPI with the following command:
-```
-./configure --prefix=YOUR/PATH CC=icc CXX=icpc
-```
-
-To download and install GSL, please visit http://www.gnu.org/software/gsl/
 
 ### VENICE
 

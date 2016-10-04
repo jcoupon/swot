@@ -7,7 +7,7 @@ GSL =  #/usr/local
 MPI = #/opt/openmpi-1.8.6_clang
 
 # compiler options
-ifneq ($(MPI), ) 
+ifneq ($(MPI), )
 	MPICC       = $(MPI)/bin/mpicc
 else
 	MPICC       = mpicc
@@ -15,7 +15,7 @@ endif
 
 CFLAGS      = -Iinclude # -use-asm # for old icc versions
 LDFLAGS     =  -lgsl -lgslcblas -lm
-MPI_CFLAGS  = 
+MPI_CFLAGS  =
 MPI_LFLAGS  = 
 RM          = rm -f
 EXEC        = bin/swot
@@ -28,14 +28,14 @@ OBJS    = $(SRCS:.c=.o)
 
 # Headers for libraries
 
-ifneq ($(GSL), ) 
+ifneq ($(GSL), )
 	CFLAGS     +=  -I$(GSL)/include
-	LDFLAGS    +=  -L$(GSL)/lib 
+	LDFLAGS    +=  -L$(GSL)/lib
 endif
 
-ifneq ($(MPI), ) 
+ifneq ($(MPI), )
 	MPI_CFLAGS +=  -I$(MPI)/include
-	MPI_LFLAGS +=  -L$(MPI)/lib 
+	MPI_LFLAGS +=  -L$(MPI)/lib
 endif
 
 .PHONY: all
@@ -45,9 +45,9 @@ vpath %.h include
 vpath %.c src
 
 $(EXEC):  $(OBJS)
-	$(MPICC)  -o $@ $^ $(CFLAGS) $(LDFLAGS) $(MPI_CFLAGS) $(MPI_LFLAGS) 
+	$(MPICC)  -o $@ $^ $(CFLAGS) $(LDFLAGS) $(MPI_CFLAGS) $(MPI_LFLAGS)
 
-%.o:  %.c 
+%.o:  %.c
 	$(MPICC) -c -o $@ $< $(CFLAGS) $(MPI_CFLAGS)
 
 %.h:
