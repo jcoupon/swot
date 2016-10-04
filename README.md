@@ -65,7 +65,7 @@ Run the software:
 
 Display the default configuration file:
 ```
-    swot -d: display a default configuration file
+   swot -d: display a default configuration file
 ```
 
 *Important*: if using "RADEC" coordinates, the angle in the input catalogues must be in decimal degrees.
@@ -97,12 +97,16 @@ From Athena's documentation:
 	see its influence on the results. As a guideline, OATH = 0.05 (about 3 degrees)
 	can be used."
 
+
+### Weighted quantities:
+
+`-weighted`: compute weighted quantities ([X]: column for the weights if available). WARNING: if set, all input files must contain a weight column (including the random samples, put 1.0's if no weight).
+
+
 ### Input format (ascii files)
 
 
-Notes:
-
-`-weighted`: compute weighted quantities ([X]: column for the weights if available). WARNING: if set, all input files must contain a weight column (including the random samples, put 1.0's if no weight).
+The input format is set with the `cols[1,2]` and `rancols[1,2]` options (the first column is "1"):
 
 * default input format for `number` `RA DEC m [weight]`: change column ids with: `-cols1 1,2,3[,4]`, with `m` the quantity to compute the histogram for. Positions on the sky are required for the computation of sky-based resampling errors.
 
@@ -115,6 +119,8 @@ Notes:
 * default input format for `gglens`. Lenses (`-cols1`) `RA DEC z sigz`. Change column ids with: `-cols1 1,2,3,4`. Sources (`-cols2`) `RA DEC z sigz e1 e2 weight`. Change column ids with: `-cols2 1,2,3,4,5,6,7`.
 
 * default input format for `gglens` to compute calibration factor (`-calib yes`). Lenses (`-cols1`) `RA DEC z sigz`. Change column ids with: `-cols1 1,2,3,4`. Sources (`-cols2`) `RA DEC z sigz calib e2 weight`. Change column ids with: `-cols2 1,2,3,4,5,6,7`, where calib = 1+m or c.
+
+
 
 ## Memory usage
 
