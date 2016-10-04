@@ -1,6 +1,7 @@
 # swot (Super W Of Theta)
 
-Author: Jean Coupon
+Author: Jean Coupon.
+
 Contributors: Alexie Leauthaud, Martin Kilbinger, Elinor Medezinski.
 
 ## Description
