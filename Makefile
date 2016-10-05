@@ -16,14 +16,14 @@ endif
 CFLAGS      = -Iinclude # -use-asm # for old icc versions
 LDFLAGS     =  -lgsl -lgslcblas -lm
 MPI_CFLAGS  =
-MPI_LFLAGS  = 
+MPI_LFLAGS  =
 RM          = rm -f
 EXEC        = bin/swot
 SRC         = main.c
 OBJ         = $(SRC:.c=.o)
 
 # source files
-SRCS    = main.c
+SRCS    = utils.c tree.c init.c  main.c
 OBJS    = $(SRCS:.c=.o)
 
 # Headers for libraries

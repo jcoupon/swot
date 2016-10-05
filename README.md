@@ -130,7 +130,7 @@ Maximum efficiency is reached when the number of cpus is a power of two.
 
 ## How to contribute to this project
 
-(Workflow taken from https://github.com/github/gitignore/edit/master/README.md)
+(Workflow taken from https://github.com/github/gitignore)
 
 1. [Fork this project][fork] to your account.
 2. [Create a branch][branch] for the change you intend to make.
