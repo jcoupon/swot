@@ -116,33 +116,33 @@ void numberCount(Config para){
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random.N);}
 
       comment(para,"Reading fileIn1....");  data  = readCat(para, para.fileInName1, para.data1Id, para.weighted);
-      if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data.N);}
+      if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", data.N);}
    }
 
-   /* resample, build masks */
+   /*    resample, build masks */
    comment(para, "Resampling...");
    resample(&para, &random, dimStart, &mask, FIRSTCALL);
 
-   /* send data */
+   /*    send data */
    comment(para, "sending data...");
    comData(para, &random, 0, dimStart, FIRSTCALL);
    comData(para, &data  , 0, dimStart, FIRSTCALL);
 
-   /* grow trees */
+   /*    grow trees */
    comment(para, "building trees...");
    dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
    comment(para, "done.\n");
 
-   /* Output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
+   /*    Output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
    if(para.rank == 0 && para.printTree){
       sprintf(fileOutName, "%s.data.tree", para.fileOutName);
       printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
    }
 
-   /* divide and conquer */
+   /*    divide and conquer */
    long nodeSlaveData = splitTree(&para, &dataTree, ROOT, para.size, FIRSTCALL);
 
-   /* compute number of objects */
+   /*    compute number of objects */
    comment(para, "N...       "); N = Nobjects(&para, &dataTree, nodeSlaveData, FIRSTCALL);
 
    freeMask(para, mask);
@@ -154,7 +154,7 @@ void numberCount(Config para){
    /* print out results */
    if(para.rank == MASTER){
 
-      /* R */
+      /*    R */
       double *R          = (double *)malloc(para.nbins*sizeof(double));
       double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
       for(i=0;i<para.nbins;i++){
@@ -168,9 +168,9 @@ void numberCount(Config para){
          }
       }
 
-      /* Errors  ------------------------------------------------------------------------ */
+      /*    Errors  */
 
-      /* mean N and errors */
+      /*    mean N and errors */
       double *Nmean = (double *)malloc(para.nbins*sizeof(double));
       double *err_r = (double *)malloc(para.nbins*sizeof(double));
       double *err_p = (double *)malloc(para.nbins*sizeof(double));
@@ -186,7 +186,7 @@ void numberCount(Config para){
 
          Nmean[i] = err_r[i] = 0.0;
 
-         /* 1. resampling error */
+         /*    1. resampling error */
          if(para.nsamples > 1){ /* mean */
             for(l=0;l<para.nsamples;l++){
                //norm_N = N.N1[0]/N.N1[l+1];
@@ -199,11 +199,11 @@ void numberCount(Config para){
             err_r[i] = sqrt(norm*err_r[i]);
          }
 
-         /* 2. poisson error ~1/N */
+         /*    2. poisson error ~1/N */
          err_p[i] = sqrt(N.NN[para.nbins*0+i]);
       }
 
-      /* write file out ------------------------------------------------------------------------ */
+      /*    write file out */
       fileOut = fopen(para.fileOutName, "w");
       fprintf(fileOut, "# Number counts.\n");
       switch(para.err){
@@ -217,17 +217,13 @@ void numberCount(Config para){
       }
       fclose(fileOut);
 
-      /* write samples */
+      /*    write samples */
       if(para.printSamples){
          sprintf(fileOutName, "%s.samples", para.fileOutName);
-
-         /* To do */
-
-
+         /* TODO */
       }
 
-
-      /* write file out covariance matrix -------------------------------------------------------------- */
+      /*    write file out covariance matrix */
       if(para.cov_mat){
          double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
          sprintf(fileOutName, "%s.cov", para.fileOutName);
@@ -260,10 +256,10 @@ void numberCount(Config para){
 }
 
 void autoCorr(Config para){
-   /* Computes the auto correlation function.
-   * for autocorrelation, each cpu correlates all nodes from the root
-   * with all nodes from a subnode (which is only a part of the tree).
-   */
+   /*    Computes the auto correlation function.
+    *    for autocorrelation, each cpu correlates all nodes from the root
+    *    with all nodes from a subnode (which is only a part of the tree).
+    */
 
    int dimStart = 0;
    long i, j, k, l, n;
@@ -275,13 +271,8 @@ void autoCorr(Config para){
    char  fileOutName[1000];
    FILE *fileOut, *fileRR;
 
-   /* read files */
+   /*    read files */
    if(para.rank == MASTER){
-
-
-      // DEBUGGING
-      // printf("%d\n",  para.ran1Id[3]);
-      // exit(-1);
 
       comment(para,"Reading fileRan1..."); random = readCat(para, para.fileRanName1, para.ran1Id,  para.weighted);
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random.N);}
@@ -291,33 +282,33 @@ void autoCorr(Config para){
 
    }
 
-   /* resample, build masks */
+   /*    resample, build masks */
    comment(para, "Resampling...");
    resample(&para, &random, dimStart, &mask, FIRSTCALL);
 
-   /* send data */
+   /*    send data */
    comment(para, "sending data...");
    comData(para, &random, 0, dimStart, FIRSTCALL);
    comData(para, &data  , 0, dimStart, FIRSTCALL);
 
-   /* grow trees */
+   /*    grow trees */
    comment(para, "building trees...");
    randomTree = buildTree(&para, &random, &mask, dimStart, FIRSTCALL);   freePoint(para, random);
    dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
    comment(para, "done.\n");
 
-   /* divide and conquer */
+   /*    divide and conquer */
    long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
    long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
 
-   /* Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
+   /*    output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
    if(para.rank == 0 && para.printTree){
       sprintf(fileOutName, "%s.data.tree", para.fileOutName);
       printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
       //exit(-1);
    }
 
-   /* compute pairs */
+   /*    compute pairs */
    switch (para.corr){
       case AUTO: case AUTO_3D:
       if (!strcmp(para.RRInFileName, "")){
@@ -335,27 +326,20 @@ void autoCorr(Config para){
       break;
    }
 
-
-   //  printf("rank = %d\n", para.rank);
-   //  exit(-1);
-
-
-
-
    freeMask(para, mask);
    freeTree(para, randomTree);
    freeTree(para, dataTree);
 
-   /* each slave sends the result and master sums everything up */
+   /*    each slave sends the result and master sums everything up */
    if (!strcmp(para.RRInFileName, "")){
       comResult(para, RR, para.size, 0);
    }
    comResult(para, DR, para.size, 0);
    comResult(para, DD, para.size, 0);
 
-   /* RR pairs */
+   /*    RR pairs */
    if(para.rank == MASTER){
-      /* Save RR pairs */
+      /*       Save RR pairs */
       if (strcmp(para.RROutFileName, "")){
          fileRR = fopen(para.RROutFileName, "w");
          if(para.corr == AUTO || para.corr == AUTO_3D){
@@ -373,7 +357,8 @@ void autoCorr(Config para){
          fclose(fileRR);
       }
 
-      /* Get RR pairs from previous run */
+      /*    Get RR pairs from previous run */
+      /* TODO: save bins and check them at load time */
       if (strcmp(para.RRInFileName, "")){
          fileRR = fopen(para.RRInFileName, "r");
          if(para.corr == AUTO || para.corr == AUTO_3D){
@@ -403,10 +388,10 @@ void autoCorr(Config para){
       }
    }
 
-   /* print out results */
+   /*    print out results */
    if(para.rank == MASTER){
 
-      /* R */
+      /*    R */
       double *R          = (double *)malloc(para.nbins*sizeof(double));
       double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
       for(i=0;i<para.nbins;i++){
@@ -426,8 +411,8 @@ void autoCorr(Config para){
 
 
 
-      /* Errors  ------------------------------------------------------------------------ */
-      /* mean w(theta) and errors */
+      /*    Errors  */
+      /*    mean w(theta) and errors */
       double *wmean = (double *)malloc(para.nbins*sizeof(double));
       double *err_r = (double *)malloc(para.nbins*sizeof(double));
       double *err_p = (double *)malloc(para.nbins*sizeof(double));
@@ -440,127 +425,125 @@ void autoCorr(Config para){
 
       for(i=0;i<para.nbins;i++){
          wmean[i] = err_r[i] = 0.0;
-         /* 1. resampling error */
-         if(para.nsamples > 1){ /* mean */
+         /*    1. resampling error */
+         if(para.nsamples > 1){ /*  mean */
             for(l=0;l<para.nsamples;l++){
                switch (para.corr){
                   case AUTO: case AUTO_3D:
-                  wmean[i] += wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
-                  break;
+                     wmean[i] += wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
+                     break;
                   case AUTO_WP:
-                  /* DEBUGGING */
-                  wmean[i] += wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1)/(double)para.nsamples;
-                  // wmean[i] += xis(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
-                  break;
+                     wmean[i] += wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1)/(double)para.nsamples;
+                     // wmean[i] += xis(para, para.estimator, DD, RR, DR, DR, i, l+1)/(double)para.nsamples;
+                     break;
                }
             }
             for(l=0;l<para.nsamples;l++){ /* dispersion */
                switch (para.corr){
                   case AUTO: case AUTO_3D:
-                  err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1));
-                  break;
+                     err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1));
+                     break;
                   case AUTO_WP:
-                  /* DEBUGGING */
-                  err_r[i] += SQUARE(wmean[i]-wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1));
-                  //err_r[i] += SQUARE(wmean[i]-xis(para, para.estimator, DD, RR, DR, DR, i, l+1));
+                     err_r[i] += SQUARE(wmean[i]-wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1));
+                     //err_r[i] += SQUARE(wmean[i]-xis(para, para.estimator, DD, RR, DR, DR, i, l+1));
                   break;
                }
             }
             err_r[i] = sqrt(norm*err_r[i]);
          }
-         /* 2. poisson error ~1/N */
+         /*    2. poisson error ~1/N */
          switch (para.corr){
             case AUTO:  case AUTO_3D:
-            if(DD.NN[para.nbins*0+i] > 0 && RR.NN[para.nbins*0+i] > 0){
-               err_p[i] = ABS(1.0+wTheta(para, para.estimator, DD, RR, DR, DR, i, 0))*(1.0/sqrt((double)DD.NN[para.nbins*0+i]) + 1.0/sqrt((double)RR.NN[para.nbins*0+i]));
-            }else{
-               err_p[i] = 0.0;
-            }
-            break;
+               if(DD.NN[para.nbins*0+i] > 0 && RR.NN[para.nbins*0+i] > 0){
+                  err_p[i] = ABS(1.0+wTheta(para, para.estimator, DD, RR, DR, DR, i, 0))*(1.0/sqrt((double)DD.NN[para.nbins*0+i]) + 1.0/sqrt((double)RR.NN[para.nbins*0+i]));
+               }else{
+                  err_p[i] = 0.0;
+               }
+               break;
             case AUTO_WP:
-            DD_sum = 0;
-            RR_sum = 0;
-            j      = 0;
-            while(R[j] < para.pi_max && j < para.nbins){ /* sum over pi integration */
-               DD_sum += DD.NN[i + para.nbins*j];
-               RR_sum += RR.NN[i + para.nbins*j];
-               j++;
-            }
-            if(DD_sum > 0 && RR_sum > 0){
-               err_p[i] = ABS(1.0+wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0))*(1.0/sqrt((double)DD_sum + 1.0/sqrt((double)RR_sum)));
-            }else{
-               err_p[i] = 0.0;
-            }
-            break;
+               DD_sum = 0;
+               RR_sum = 0;
+               j      = 0;
+               while(R[j] < para.pi_max && j < para.nbins){ /* sum over pi integration */
+                  DD_sum += DD.NN[i + para.nbins*j];
+                  RR_sum += RR.NN[i + para.nbins*j];
+                  j++;
+               }
+               if(DD_sum > 0 && RR_sum > 0){
+                  err_p[i] = ABS(1.0+wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0))*(1.0/sqrt((double)DD_sum + 1.0/sqrt((double)RR_sum)));
+               }else{
+                  err_p[i] = 0.0;
+               }
+               break;
          }
       }
 
-      /* write file out ------------------------------------------------------------------------ */
+      /*    write file out */
       fileOut = fopen(para.fileOutName, "w");
       switch(para.estimator){
          case LS:      fprintf(fileOut, "# Auto-correlation, Landy & Szalay estimator.\n"); break;
          case NAT:     fprintf(fileOut, "# Auto-correlation, Natural estimator.\n");        break;
          case HAM:     fprintf(fileOut, "# Auto-correlation, Hamilton estimator.\n");       break;
-         case PEEBLES: fprintf(fileOut, "# Auto-correlation, Peebles estimator.\n");       break;
+         case PEEBLES: fprintf(fileOut, "# Auto-correlation, Peebles estimator.\n");        break;
       }
       switch(para.err){
          case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
          case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
       }
       switch(para.corr){
-         /* If auto correlation  ------------------------------------------------------------------------ */
+         /* If auto correlation  */
          case AUTO:  case AUTO_3D:
-         fprintf(fileOut, "#  R            w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
-         /*
-         if(para.proj == COMO){
-            fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
-         }else if(para.proj == PHYS){
-            fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
-         }else{
-            fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
-         }
-         */
-         for(i=0;i<para.nbins;i++){
-            fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
-            R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
-            err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
-            DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
-         }
-         break;
-         /* If wp(rp) auto correlation  ------------------------------------------------------------------------ */
-         case AUTO_WP:
-         fprintf(fileOut, "# pi upper limit integration: %5.2f Mpc.\n", para.pi_max);
-         fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
-         fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
-         if(para.proj == COMO){
-            fprintf(fileOut, "# rp (comoving) wp    err(resamp) err(resamp-poisson) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
-         }else if(para.proj == PHYS){
-            fprintf(fileOut, "# rp (physical) wp    err(resamp) err(resamp-poisson) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
-         }
-         for(i=0;i<para.nbins;i++){
-            RR_sum = 0;
-            DR_sum = 0;
-            DD_sum = 0;
-            j      = 0;
-            while(R[j] < para.pi_max && j < para.nbins){  /* sum over pi integration - ONLY informative */
-               RR_sum += RR.NN[i + para.nbins*j];
-               DR_sum += DR.NN[i + para.nbins*j];
-               DD_sum += DD.NN[i + para.nbins*j];
-               j++;
+            fprintf(fileOut, "#  R            w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            /*
+            if(para.proj == COMO){
+               fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            }else if(para.proj == PHYS){
+               fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            }else{
+               fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
             }
+            */
+            for(i=0;i<para.nbins;i++){
+               fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
+                  R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
+                  err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
+                  DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
+            }
+            break;
+         /* If wp(rp) auto correlation  */
+         case AUTO_WP:
+            fprintf(fileOut, "# pi upper limit integration: %5.2f Mpc.\n", para.pi_max);
+            fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
+            fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
+            if(para.proj == COMO){
+               fprintf(fileOut, "# rp (comoving) wp    err(resamp) err(resamp-poisson) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
+            }else if(para.proj == PHYS){
+               fprintf(fileOut, "# rp (physical) wp    err(resamp) err(resamp-poisson) err(poisson)        <R>           sum(DD)           sum(DR)           sum(RR)             Ndata           Nrandom\n");
+            }
+            for(i=0;i<para.nbins;i++){
+               RR_sum = 0;
+               DR_sum = 0;
+               DD_sum = 0;
+               j      = 0;
+               while(R[j] < para.pi_max && j < para.nbins){  /* sum over pi integration - ONLY informative */
+                  RR_sum += RR.NN[i + para.nbins*j];
+                  DR_sum += DR.NN[i + para.nbins*j];
+                  DD_sum += DD.NN[i + para.nbins*j];
+                  j++;
+               }
 
-            /* TEST: xis(para, para.estimator, DD, RR, DR, DR, i, 0),*/
+               /* TEST: xis(para, para.estimator, DD, RR, DR, DR, i, 0),*/
 
-            fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
-            R[i], wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0),
-            err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))),  err_p[i], meanR[i],
-            DD_sum, DR_sum, RR_sum,  DD.N1[0],  RR.N1[0]);
-         }
-         break;
+               fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
+                  R[i], wp(para, para.estimator, DD, RR, DR, DR, -1, i, 0),
+                  err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))),  err_p[i], meanR[i],
+                  DD_sum, DR_sum, RR_sum,  DD.N1[0],  RR.N1[0]);
+            }
+            break;
       }
       fclose(fileOut);
 
-      /* write file out xi(rp,pi) --------------------------------------------------------------------- */
+      /*    write file out xi(rp,pi) */
       if(para.corr == AUTO_WP && para.xi){
          sprintf(fileOutName, "%s.xi", para.fileOutName);
          fileOut = fopen(fileOutName,"w");
@@ -576,18 +559,18 @@ void autoCorr(Config para){
          fclose(fileOut);
       }
 
-      /* write samples */
+      /*    write samples */
       if(para.printSamples){
          sprintf(fileOutName, "%s.samples", para.fileOutName);
          fileOut = fopen(fileOutName, "w");
 
-         /* Print resampling method */
+         /*    Print resampling method */
          switch(para.err){
             case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
             case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
          }
 
-         /* Print bin values */
+         /*    Print bin values */
          fprintf(fileOut, "#");
          for(i=0;i<para.nbins;i++){
             fprintf( fileOut, "%12.7f ", R[i]);
@@ -596,27 +579,27 @@ void autoCorr(Config para){
 
          switch(para.corr){
             case AUTO: case AUTO_3D:
-            for(l=0;l<para.nsamples;l++){
-               for(i=0;i<para.nbins;i++){
-                  fprintf(fileOut, "%12.7f ", wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1) );
+               for(l=0;l<para.nsamples;l++){
+                  for(i=0;i<para.nbins;i++){
+                     fprintf(fileOut, "%12.7f ", wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1) );
+                  }
+                  fprintf(fileOut, "\n");
                }
-               fprintf(fileOut, "\n");
-            }
-            break;
+               break;
             case AUTO_WP:
-            for(l=0;l<para.nsamples;l++){
-               for(i=0;i<para.nbins;i++){
-                  fprintf(fileOut, "%12.7f ", wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1) );
+               for(l=0;l<para.nsamples;l++){
+                  for(i=0;i<para.nbins;i++){
+                     fprintf(fileOut, "%12.7f ", wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1) );
+                  }
+                  fprintf(fileOut, "\n");
                }
-               fprintf(fileOut, "\n");
-            }
-            break;
+               break;
          }
          fclose(fileOut);
       }
 
 
-      /* write file out covariance matrix -------------------------------------------------------------- */
+      /*    write file out covariance matrix */
       if(para.cov_mat){
          double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
          for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
@@ -626,17 +609,17 @@ void autoCorr(Config para){
             for(j=0;j<para.nbins;j++){
                switch(para.corr){
                   case AUTO:  case AUTO_3D:
-                  for(l=0;l<para.nsamples;l++){
-                     cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1))
-                     *(wmean[j]-wTheta(para, para.estimator, DD, RR, DR, DR, j, l+1));
-                  }
-                  break;
+                     for(l=0;l<para.nsamples;l++){
+                        cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, DD, RR, DR, DR, i, l+1))
+                        *(wmean[j]-wTheta(para, para.estimator, DD, RR, DR, DR, j, l+1));
+                     }
+                     break;
                   case AUTO_WP:
-                  for(l=0;l<para.nsamples;l++){
-                     cov[para.nbins*i+j] += norm*(wmean[i]-wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1))
-                     *(wmean[j]-wp(para, para.estimator, DD, RR, DR, DR, -1, j, l+1));
-                  }
-                  break;
+                     for(l=0;l<para.nsamples;l++){
+                        cov[para.nbins*i+j] += norm*(wmean[i]-wp(para, para.estimator, DD, RR, DR, DR, -1, i, l+1))
+                        *(wmean[j]-wp(para, para.estimator, DD, RR, DR, DR, -1, j, l+1));
+                     }
+                     break;
                }
                fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
             }
@@ -663,9 +646,9 @@ void autoCorr(Config para){
 }
 
 void crossCorr(Config para){
-   /* Computes the cross-correlation function.
-   * for autocorrelation, each cpu correlates all nodes from the root
-   * with all nodes from a subnode (which is only a part of the tree).
+   /*    Computes the cross-correlation function.
+   *     for autocorrelation, each cpu correlates all nodes from the root
+   *     with all nodes from a subnode (which is only a part of the tree).
    */
 
    int swapped = 0, dimStart = 0;
@@ -678,7 +661,7 @@ void crossCorr(Config para){
    char  fileOutName[1000];
    FILE *fileOut, *fileRR;
 
-   /* read files */
+   /*    read files */
    if(para.rank == MASTER){
       comment(para,"Reading fileRan1..."); random1 = readCat(para, para.fileRanName1, para.ran1Id, para.weighted);
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n", random1.N);}
@@ -699,415 +682,405 @@ void crossCorr(Config para){
       tmp = data1;   data1   = data2;   data2   = tmp;
       tmp = random1; random1 = random2; random2 = tmp;
       swapped = 1;
-   }
-   */
-}
-
-/* resample, build mask from random file 1 */
-comment(para, "Resampling...");
-resample(&para, &random1, dimStart, &mask, FIRSTCALL);
-
-/* send data */
-comment(para, "sending data...");
-comData(para, &random1, 0, dimStart, FIRSTCALL);
-//comData(para, &random2, para.size, dimStart, FIRSTCALL); /* 2 is partitioned among cpus */
-comData(para, &random2, 0, dimStart, FIRSTCALL);
-comData(para, &data1, 0, dimStart, FIRSTCALL);
-comData(para, &data2, 0, dimStart, FIRSTCALL);
-
-
-/* grow trees */
-comment(para, "building trees...");
-randomTree1 = buildTree(&para, &random1, &mask, dimStart, FIRSTCALL);   freePoint(para, random1);
-randomTree2 = buildTree(&para, &random2, &mask, dimStart, FIRSTCALL);   freePoint(para, random2);
-dataTree1   = buildTree(&para, &data1, &mask, dimStart, FIRSTCALL);     freePoint(para, data1);
-dataTree2   = buildTree(&para, &data2, &mask, dimStart, FIRSTCALL);     freePoint(para, data2);
-comment(para, "done.\n");
-
-/* Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
-if(para.rank == 0 && para.printTree){
-
-   sprintf(fileOutName, "%s.data1.tree", para.fileOutName);
-   printTree(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
-
-   sprintf(fileOutName, "%s.data2.tree", para.fileOutName);
-   printTree(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
-}
-
-/* divide and conquer */
-
-long nodeSlaveRan1  = splitTree(&para, &randomTree1, ROOT, para.size, FIRSTCALL);
-long nodeSlaveRan2  = splitTree(&para, &randomTree2, ROOT, para.size, FIRSTCALL);
-// long nodeSlaveData1 = splitTree(&para, &dataTree1,   ROOT, para.size, FIRSTCALL);
-long nodeSlaveData2 = splitTree(&para, &dataTree2,   ROOT, para.size, FIRSTCALL);
-
-/* end of the main program */
-//MPI_Finalize();
-//exit(-1);
-
-
-/* compute pairs */
-switch (para.corr){
-   case CROSS: case CROSS_3D:
-   if (!strcmp(para.RRInFileName, "")){
-      comment(para, "R1R2...       "); R1R2 = Npairs(&para, &randomTree1, ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
-   }
-
-//  DEBUGGING - which one is correct for Peebles? D1R2 or D1R2?
-//   comment(para, "D1R2...       "); D1R2 = Npairs(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
-//   comment(para, "D2R1...       "); D2R1 = Npairs(&para, &dataTree2,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
-   comment(para, "D1R2...       "); D1R2 = Npairs(&para, &dataTree1,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
-   comment(para, "D2R1...       "); D2R1 = Npairs(&para, &dataTree2,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
-
-   comment(para, "D1D2...       "); D1D2 = Npairs(&para, &dataTree1,   ROOT, &dataTree2,   nodeSlaveData2, FIRSTCALL);
-   break;
-   case CROSS_WP:
-   if (!strcmp(para.RRInFileName, "")){
-      comment(para, "R1R2(rp,pi)...       "); R1R2 = Npairs3D(&para, &randomTree1, ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
-   }
-
-//  DEBUGGING - which one is correct for Peebles? D1R2 or D1R2?
-//   comment(para, "D1R2(rp,pi)...       "); D1R2 = Npairs3D(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
-//   comment(para, "D2R1(rp,pi)...       "); D2R1 = Npairs3D(&para, &dataTree2,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
-   comment(para, "D1R2(rp,pi)...       "); D1R2 = Npairs3D(&para, &dataTree1,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
-   comment(para, "D2R1(rp,pi)...       "); D2R1 = Npairs3D(&para, &dataTree2,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
-
-   comment(para, "D1D2(rp,pi)...       "); D1D2 = Npairs3D(&para, &dataTree1,   ROOT, &dataTree2,   nodeSlaveData2, FIRSTCALL);
-   break;
-}
-
-freeMask(para, mask);
-freeTree(para, randomTree1);
-freeTree(para, randomTree2);
-freeTree(para, dataTree1);
-freeTree(para, dataTree2);
-
-/* each slave sends the result and master sums everything up */
-if (!strcmp(para.RRInFileName, "")){
-   comResult(para, R1R2, para.size, 0); /* "1" to tell MASTER to sum up the total number         */
-}
-comResult(para, D1R2, para.size, 0); /* of objects since R2 has been partitionned among cpus  */
-comResult(para, D2R1, para.size, 0);
-comResult(para, D1D2, para.size, 0);
-
-/* RR pairs */
-if(para.rank == MASTER){
-   /* Save RR pairs */
-   if (strcmp(para.RROutFileName, "")){
-      fileRR = fopen(para.RROutFileName, "w");
-      if(para.corr == CROSS || para.corr == CROSS_3D){
-         fwrite(R1R2.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
-         fwrite(R1R2.N1, sizeof(double),    para.nsamples+1, fileRR);
-         fwrite(R1R2.N2, sizeof(double),    para.nsamples+1, fileRR);
-         fwrite(R1R2.meanR, sizeof(double), para.nbins, fileRR);
-      }else if(para.corr == CROSS_WP){
-         fwrite(R1R2.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
-         fwrite(R1R2.N1,    sizeof(double), para.nsamples+1, fileRR);
-         fwrite(R1R2.N2,    sizeof(double), para.nsamples+1, fileRR);
-         fwrite(R1R2.meanR, sizeof(double), para.nbins, fileRR);
-         fwrite(R1R2.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
-      }
-      fclose(fileRR);
-   }
-
-   /* Get RR pairs from previous run */
-   if (strcmp(para.RRInFileName, "")){
-      fileRR = fopen(para.RRInFileName, "r");
-      if(para.corr == CROSS || para.corr == CROSS_3D){
-         R1R2.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
-         R1R2.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
-         R1R2.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
-         R1R2.meanR = (double *)malloc(para.nbins*sizeof(double));
-
-         fread(R1R2.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
-         fread(R1R2.N1, sizeof(double),    para.nsamples+1, fileRR);
-         fread(R1R2.N2, sizeof(double),    para.nsamples+1, fileRR);
-         fread(R1R2.meanR, sizeof(double), para.nbins, fileRR);
-      }else if(para.corr == CROSS_WP){
-         R1R2.NN    = (double *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(double));
-         R1R2.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
-         R1R2.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
-         R1R2.meanR = (double *)malloc(para.nbins*sizeof(double));
-         R1R2.NN_s  = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
-
-         fread(R1R2.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
-         fread(R1R2.N1,    sizeof(double), para.nsamples+1, fileRR);
-         fread(R1R2.N2,    sizeof(double), para.nsamples+1, fileRR);
-         fread(R1R2.meanR, sizeof(double), para.nbins, fileRR);
-         fread(R1R2.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
-      }
-      fclose(fileRR);
-   }
-}
-
-
-
-
-/* print out results */
-if(para.rank == MASTER){
-
-   /* R */
-   double *R          = (double *)malloc(para.nbins*sizeof(double));
-   double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
-   for(i=0;i<para.nbins;i++){
-      if(para.corr == CROSS || para.corr == CROSS_3D) sum = (double)D1D2.NN[i];
-      if(para.corr == CROSS_WP) {
-         sum = 0.0;
-         for(j=0;j<para.nbins;j++) sum += D1D2.NN[i + para.nbins*j];
-      }
-      if(para.log){
-         R[i] = meanR[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
-         if(sum > 0.0) meanR[i] = exp(D1D2.meanR[i]/sum);
-      }else{
-         R[i] = meanR[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
-         if(sum > 0.0) meanR[i] = D1D2.meanR[i]/sum;
-      }
-   }
-
-   /* mean w(theta) and errors */
-   double *wmean = (double *)malloc(para.nbins*sizeof(double));
-   double *err_r = (double *)malloc(para.nbins*sizeof(double));
-   double *err_p = (double *)malloc(para.nbins*sizeof(double));
-
-   double norm;
-   switch(para.err){
-      case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
-      case BOOTSTRAP: norm = 1.0/(double)(para.nsamples - 1); break;
-   }
-
-   /* Errors  ------------------------------------------------------------------------ */
-   for(i=0;i<para.nbins;i++){
-      wmean[i] = err_r[i] = 0.0;
-      /* 1. resampling error */
-      if(para.nsamples > 1){
-         for(l=0;l<para.nsamples;l++){ /* mean */
-            switch (para.corr){
-               case CROSS: case CROSS_3D:
-               wmean[i] += wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1)/(double)para.nsamples;
-               break;
-               case CROSS_WP:
-               wmean[i] += wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1)/(double)para.nsamples;
-               break;
-            }
-         }
-         for(l=0;l<para.nsamples;l++){ /* dispersion */
-            switch (para.corr){
-               case CROSS: case CROSS_3D:
-               err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1));
-               break;
-               case CROSS_WP:
-               err_r[i] += SQUARE(wmean[i]-wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1));
-               break;
-            }
-         }
-         err_r[i] = sqrt(norm*err_r[i]);
-      }
-      /* 2. poisson error ~1/N */
-      switch (para.corr){
-         case CROSS: case CROSS_3D:
-         if(D1D2.NN[para.nbins*0+i] > 0 && R1R2.NN[para.nbins*0+i] > 0){
-            err_p[i] = ABS(1.0+wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, 0))*(1.0/sqrt((double)D1D2.NN[para.nbins*0+i]) + 1.0/sqrt((double)R1R2.NN[para.nbins*0+i]));
-         }else{
-            err_p[i] = 0.0;
-         }
-         break;
-         case CROSS_WP:
-         D1D2_sum = 0;
-         R1R2_sum = 0;
-         j        = 0;
-         while(R[j] < para.pi_max && j < para.nbins){ /* sum over pi integration */
-            D1D2_sum += D1D2.NN[i + para.nbins*j];
-            R1R2_sum += R1R2.NN[i + para.nbins*j];
-            j++;
-         }
-         if(D1D2_sum > 0 && R1R2_sum > 0){
-            err_p[i] = ABS(1.0+wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, 0))*(1.0/sqrt((double)D1D2_sum + 1.0/sqrt((double)R1R2_sum)));
-         }else{
-            err_p[i] = 0.0;
-         }
-         break;
-      }
-   }
-
-   /* write file out ------------------------------------------------------------------------ */
-   fileOut = fopen(para.fileOutName,"w");
-   if(swapped) fprintf(fileOut, "# ATTENTION: \"1\" and \"2\" have been swapped to save memory.\n");
-   switch(para.estimator){
-      case LS:      fprintf(fileOut, "# Cross-correlation. Landy & Szalay estimator\n"); break;
-      case NAT:     fprintf(fileOut, "# Cross-correlation. Natural estimator\n");        break;
-      case HAM:     fprintf(fileOut, "# Cross-correlation. Hamilton estimator\n");       break;
-      case PEEBLES: fprintf(fileOut, "# Cross-correlation, Peebles estimator.\n");       break;
-   }
-   switch(para.err){
-      case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
-      case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
-   }
-   switch(para.corr){
-      /* If cross correlation  ------------------------------------------------------------------------ */
-      case CROSS: case CROSS_3D:
-      fprintf(fileOut, "#  R            w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
-
-      /*
-      if(para.proj == COMO){
-         fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
-      }else if(para.proj == PHYS){
-         fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
-      }else{
-         fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
       }
       */
-      for(i=0;i<para.nbins;i++){
-         fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
-         R[i], wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, 0),
-         err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
-         D1D2.NN[i], D1R2.NN[i], D2R1.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
-      }
-      break;
-      /* If wp(rp) cross correlation  ------------------------------------------------------------------------ */
+   }
+
+   /*    resample, build mask from random file 1 */
+   comment(para, "Resampling...");
+   resample(&para, &random1, dimStart, &mask, FIRSTCALL);
+
+   /*    send data */
+   comment(para, "sending data...");
+   comData(para, &random1, 0, dimStart, FIRSTCALL);
+   //comData(para, &random2, para.size, dimStart, FIRSTCALL); /* 2 is partitioned among cpus */
+   comData(para, &random2, 0, dimStart, FIRSTCALL);
+   comData(para, &data1, 0, dimStart, FIRSTCALL);
+   comData(para, &data2, 0, dimStart, FIRSTCALL);
+
+
+   /*    grow trees */
+   comment(para, "building trees...");
+   randomTree1 = buildTree(&para, &random1, &mask, dimStart, FIRSTCALL);   freePoint(para, random1);
+   randomTree2 = buildTree(&para, &random2, &mask, dimStart, FIRSTCALL);   freePoint(para, random2);
+   dataTree1   = buildTree(&para, &data1, &mask, dimStart, FIRSTCALL);     freePoint(para, data1);
+   dataTree2   = buildTree(&para, &data2, &mask, dimStart, FIRSTCALL);     freePoint(para, data2);
+   comment(para, "done.\n");
+
+   /*    Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank */
+   if(para.rank == 0 && para.printTree){
+
+      sprintf(fileOutName, "%s.data1.tree", para.fileOutName);
+      printTree(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
+
+      sprintf(fileOutName, "%s.data2.tree", para.fileOutName);
+      printTree(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
+   }
+
+   /*    divide and conquer */
+
+   long nodeSlaveRan1  = splitTree(&para, &randomTree1, ROOT, para.size, FIRSTCALL);
+   long nodeSlaveRan2  = splitTree(&para, &randomTree2, ROOT, para.size, FIRSTCALL);
+   // long nodeSlaveData1 = splitTree(&para, &dataTree1,   ROOT, para.size, FIRSTCALL);
+   long nodeSlaveData2 = splitTree(&para, &dataTree2,   ROOT, para.size, FIRSTCALL);
+
+   /* end of the main program */
+   //MPI_Finalize();
+   //exit(-1);
+
+   /*    compute pairs */
+   switch (para.corr){
+      case CROSS: case CROSS_3D:
+         if (!strcmp(para.RRInFileName, "")){
+            comment(para, "R1R2...       "); R1R2 = Npairs(&para, &randomTree1, ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
+         }
+
+         // DEBUGGING - which one is correct for Peebles? D1R2 or D1R2?
+         // comment(para, "D1R2...       "); D1R2 = Npairs(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
+         // comment(para, "D2R1...       "); D2R1 = Npairs(&para, &dataTree2,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
+         comment(para, "D1R2...       "); D1R2 = Npairs(&para, &dataTree1,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
+         comment(para, "D2R1...       "); D2R1 = Npairs(&para, &dataTree2,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
+         comment(para, "D1D2...       "); D1D2 = Npairs(&para, &dataTree1,   ROOT, &dataTree2,   nodeSlaveData2, FIRSTCALL);
+         break;
       case CROSS_WP:
-      fprintf(fileOut, "# pi upper limit integration: %5.2f Mpc.\n", para.pi_max);
-      fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
-      fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
-      if(para.proj == COMO){
-         fprintf(fileOut, "#  rp(comoving) wp      err(resamp) err(resamp-poisson) err(poisson)     <rp>         sum(D1D2)         sum(D1R2)         sum(D2R1)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
-      }else if(para.proj == PHYS){
-         fprintf(fileOut, "#  rp(physical) wp      err(resamp) err(resamp-poisson) err(poisson)     <rp>         sum(D1D2)         sum(D1R2)         sum(D2R1)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
-      }
-
-      for(i=0;i<para.nbins;i++){
-         R1R2_sum = 0;
-         D1R2_sum = 0;
-         D2R1_sum = 0;
-         D1D2_sum = 0;
-         j        = 0;
-         while(R[j] < para.pi_max && j < para.nbins){  /* sum over pi integration */
-            R1R2_sum += R1R2.NN[i + para.nbins*j];
-            D1R2_sum += D1R2.NN[i + para.nbins*j];
-            D2R1_sum += D2R1.NN[i + para.nbins*j];
-            D1D2_sum += D1D2.NN[i + para.nbins*j];
-            j++;
+         if (!strcmp(para.RRInFileName, "")){
+            comment(para, "R1R2(rp,pi)...       "); R1R2 = Npairs3D(&para, &randomTree1, ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
          }
-         fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
-         R[i], wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, 0),
-         err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
-         D1D2_sum, D1R2_sum, D2R1_sum, R1R2_sum,  D1D2.N1[0], R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
-      }
-      break;
-   }
-   fclose(fileOut);
 
-   /* write file out xi(rp,pi) --------------------------------------------------------------------- */
-   if(para.corr == CROSS_WP && para.xi){
-      sprintf(fileOutName, "%s.xi", para.fileOutName);
-      fileOut = fopen(fileOutName,"w");
-      fprintf(fileOut, "# Rows: rp, columns: pi\n#");
-      for(i=0;i<para.nbins;i++) fprintf(fileOut, "%12.7f ", R[i]);
-      fprintf(fileOut, "\n");
-      for(i=0;i<para.nbins;i++){
-         for(j=0;j<para.nbins;j++){
-            fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, j, i, 0));
-         }
-         fprintf(fileOut, "\n");
-      }
-      fclose(fileOut);
+         // DEBUGGING - which one is correct for Peebles? D1R2 or D1R2?
+         // comment(para, "D1R2(rp,pi)...       "); D1R2 = Npairs3D(&para, &dataTree1,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
+         // comment(para, "D2R1(rp,pi)...       "); D2R1 = Npairs3D(&para, &dataTree2,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
+         comment(para, "D1R2(rp,pi)...       "); D1R2 = Npairs3D(&para, &dataTree1,   ROOT, &randomTree2, nodeSlaveRan2,  FIRSTCALL);
+         comment(para, "D2R1(rp,pi)...       "); D2R1 = Npairs3D(&para, &dataTree2,   ROOT, &randomTree1, nodeSlaveRan1,  FIRSTCALL);
+         comment(para, "D1D2(rp,pi)...       "); D1D2 = Npairs3D(&para, &dataTree1,   ROOT, &dataTree2,   nodeSlaveData2, FIRSTCALL);
+         break;
    }
 
+   freeMask(para, mask);
+   freeTree(para, randomTree1);
+   freeTree(para, randomTree2);
+   freeTree(para, dataTree1);
+   freeTree(para, dataTree2);
 
-   /* write samples */
-   if(para.printSamples){
-      sprintf(fileOutName, "%s.samples", para.fileOutName);
-      fileOut = fopen(fileOutName, "w");
+   /*    each slave sends the result and master sums everything up */
+   if (!strcmp(para.RRInFileName, "")){
+      comResult(para, R1R2, para.size, 0); /*   "1" to tell MASTER to sum up the total number         */
+   }
+   comResult(para, D1R2, para.size, 0); /*   of objects since R2 has been partitionned among cpus  */
+   comResult(para, D2R1, para.size, 0);
+   comResult(para, D1D2, para.size, 0);
 
-      /* Print resampling method */
+   /*    RR pairs */
+   if(para.rank == MASTER){
+      /*    Save RR pairs */
+      if (strcmp(para.RROutFileName, "")){
+         fileRR = fopen(para.RROutFileName, "w");
+         if(para.corr == CROSS || para.corr == CROSS_3D){
+            fwrite(R1R2.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
+            fwrite(R1R2.N1, sizeof(double),    para.nsamples+1, fileRR);
+            fwrite(R1R2.N2, sizeof(double),    para.nsamples+1, fileRR);
+            fwrite(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+         }else if(para.corr == CROSS_WP){
+            fwrite(R1R2.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
+            fwrite(R1R2.N1,    sizeof(double), para.nsamples+1, fileRR);
+            fwrite(R1R2.N2,    sizeof(double), para.nsamples+1, fileRR);
+            fwrite(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+            fwrite(R1R2.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
+         }
+         fclose(fileRR);
+      }
+
+      /*    Get RR pairs from previous run */
+      if (strcmp(para.RRInFileName, "")){
+         fileRR = fopen(para.RRInFileName, "r");
+         if(para.corr == CROSS || para.corr == CROSS_3D){
+            R1R2.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+            R1R2.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+            R1R2.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+            R1R2.meanR = (double *)malloc(para.nbins*sizeof(double));
+
+            fread(R1R2.NN, sizeof(double),    para.nbins*(para.nsamples+1), fileRR);
+            fread(R1R2.N1, sizeof(double),    para.nsamples+1, fileRR);
+            fread(R1R2.N2, sizeof(double),    para.nsamples+1, fileRR);
+            fread(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+         }else if(para.corr == CROSS_WP){
+            R1R2.NN    = (double *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(double));
+            R1R2.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+            R1R2.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+            R1R2.meanR = (double *)malloc(para.nbins*sizeof(double));
+            R1R2.NN_s  = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+
+            fread(R1R2.NN,    sizeof(double), para.nbins*para.nbins*(para.nsamples+1), fileRR);
+            fread(R1R2.N1,    sizeof(double), para.nsamples+1, fileRR);
+            fread(R1R2.N2,    sizeof(double), para.nsamples+1, fileRR);
+            fread(R1R2.meanR, sizeof(double), para.nbins, fileRR);
+            fread(R1R2.NN_s,  sizeof(double), para.nbins*(para.nsamples+1), fileRR);
+         }
+         fclose(fileRR);
+      }
+   }
+
+   /*    print out results */
+   if(para.rank == MASTER){
+
+      /* R */
+      double *R          = (double *)malloc(para.nbins*sizeof(double));
+      double sum, *meanR = (double *)malloc(para.nbins*sizeof(double));
+      for(i=0;i<para.nbins;i++){
+         if(para.corr == CROSS || para.corr == CROSS_3D) sum = (double)D1D2.NN[i];
+         if(para.corr == CROSS_WP) {
+            sum = 0.0;
+            for(j=0;j<para.nbins;j++) sum += D1D2.NN[i + para.nbins*j];
+         }
+         if(para.log){
+            R[i] = meanR[i] = exp(para.min+para.Delta*(double)i+para.Delta/2.0);
+            if(sum > 0.0) meanR[i] = exp(D1D2.meanR[i]/sum);
+         }else{
+            R[i] = meanR[i] = para.min+para.Delta*(double)i+para.Delta/2.0;
+            if(sum > 0.0) meanR[i] = D1D2.meanR[i]/sum;
+         }
+      }
+
+      /*    mean w(theta) and errors */
+      double *wmean = (double *)malloc(para.nbins*sizeof(double));
+      double *err_r = (double *)malloc(para.nbins*sizeof(double));
+      double *err_p = (double *)malloc(para.nbins*sizeof(double));
+
+      double norm;
+      switch(para.err){
+         case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
+         case BOOTSTRAP: norm = 1.0/(double)(para.nsamples - 1); break;
+      }
+
+      /*    Errors */
+      for(i=0;i<para.nbins;i++){
+         wmean[i] = err_r[i] = 0.0;
+         /*    1. resampling error */
+         if(para.nsamples > 1){
+            for(l=0;l<para.nsamples;l++){ /*  mean */
+               switch (para.corr){
+                  case CROSS: case CROSS_3D:
+                     wmean[i] += wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1)/(double)para.nsamples;
+                     break;
+                  case CROSS_WP:
+                     wmean[i] += wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1)/(double)para.nsamples;
+                     break;
+               }
+            }
+            for(l=0;l<para.nsamples;l++){ /*  dispersion */
+               switch (para.corr){
+                  case CROSS: case CROSS_3D:
+                     err_r[i] += SQUARE(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1));
+                     break;
+                  case CROSS_WP:
+                     err_r[i] += SQUARE(wmean[i]-wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1));
+                     break;
+               }
+            }
+            err_r[i] = sqrt(norm*err_r[i]);
+         }
+         /* 2.    poisson error ~1/N */
+         switch (para.corr){
+            case CROSS: case CROSS_3D:
+               if(D1D2.NN[para.nbins*0+i] > 0 && R1R2.NN[para.nbins*0+i] > 0){
+                  err_p[i] = ABS(1.0+wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, 0))*(1.0/sqrt((double)D1D2.NN[para.nbins*0+i]) + 1.0/sqrt((double)R1R2.NN[para.nbins*0+i]));
+               }else{
+                  err_p[i] = 0.0;
+               }
+               break;
+            case CROSS_WP:
+               D1D2_sum = 0;
+               R1R2_sum = 0;
+               j        = 0;
+               while(R[j] < para.pi_max && j < para.nbins){ /* sum over pi integration */
+                  D1D2_sum += D1D2.NN[i + para.nbins*j];
+                  R1R2_sum += R1R2.NN[i + para.nbins*j];
+                  j++;
+               }
+               if(D1D2_sum > 0 && R1R2_sum > 0){
+                  err_p[i] = ABS(1.0+wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, 0))*(1.0/sqrt((double)D1D2_sum + 1.0/sqrt((double)R1R2_sum)));
+               }else{
+                  err_p[i] = 0.0;
+               }
+               break;
+         }
+      }
+
+      /*    write file out */
+      fileOut = fopen(para.fileOutName,"w");
+      if(swapped) fprintf(fileOut, "# ATTENTION: \"1\" and \"2\" have been swapped to save memory.\n");
+      switch(para.estimator){
+         case LS:      fprintf(fileOut, "# Cross-correlation. Landy & Szalay estimator\n"); break;
+         case NAT:     fprintf(fileOut, "# Cross-correlation. Natural estimator\n");        break;
+         case HAM:     fprintf(fileOut, "# Cross-correlation. Hamilton estimator\n");       break;
+         case PEEBLES: fprintf(fileOut, "# Cross-correlation, Peebles estimator.\n");       break;
+      }
       switch(para.err){
          case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
          case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
       }
-
-      /* Print bin values */
-      fprintf(fileOut, "#");
-      for(i=0;i<para.nbins;i++){
-         fprintf( fileOut, "%12.7f ", R[i]);
-      }
-      fprintf(fileOut, "\n");
-
       switch(para.corr){
+         /*    If cross correlation */
          case CROSS: case CROSS_3D:
-         for(l=0;l<para.nsamples;l++){
-            for(i=0;i<para.nbins;i++){
-               fprintf(fileOut, "%12.7f ", wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1) );
+            fprintf(fileOut, "#  R            w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+
+            /*
+            if(para.proj == COMO){
+               fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+            }else if(para.proj == PHYS){
+               fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+            }else{
+               fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
             }
-            fprintf(fileOut, "\n");
-         }
-         break;
+            */
+            for(i=0;i<para.nbins;i++){
+               fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
+               R[i], wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, 0),
+               err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
+               D1D2.NN[i], D1R2.NN[i], D2R1.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
+            }
+            break;
+         /*    If wp(rp) cross correlation */
          case CROSS_WP:
-         for(l=0;l<para.nsamples;l++){
+            fprintf(fileOut, "# pi upper limit integration: %5.2f Mpc.\n", para.pi_max);
+            fprintf(fileOut, "# Attention: sum(...) are the integrated sums of pairs along pi,\n");
+            fprintf(fileOut, "# given for reference ONLY. No combination of these would lead to wp.\n");
+            if(para.proj == COMO){
+               fprintf(fileOut, "#  rp(comoving) wp      err(resamp) err(resamp-poisson) err(poisson)     <rp>         sum(D1D2)         sum(D1R2)         sum(D2R1)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
+            }else if(para.proj == PHYS){
+               fprintf(fileOut, "#  rp(physical) wp      err(resamp) err(resamp-poisson) err(poisson)     <rp>         sum(D1D2)         sum(D1R2)         sum(D2R1)         sum(R1R2)            Ndata1          Nrandom1            Ndata2          Nrandom2\n");
+            }
+
             for(i=0;i<para.nbins;i++){
-               fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1) );
+               R1R2_sum = 0;
+               D1R2_sum = 0;
+               D2R1_sum = 0;
+               D1D2_sum = 0;
+               j        = 0;
+               while(R[j] < para.pi_max && j < para.nbins){  /* sum over pi integration */
+                  R1R2_sum += R1R2.NN[i + para.nbins*j];
+                  D1R2_sum += D1R2.NN[i + para.nbins*j];
+                  D2R1_sum += D2R1.NN[i + para.nbins*j];
+                  D1D2_sum += D1D2.NN[i + para.nbins*j];
+                  j++;
+               }
+               fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
+               R[i], wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, 0),
+               err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
+               D1D2_sum, D1R2_sum, D2R1_sum, R1R2_sum,  D1D2.N1[0], R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
+            }
+            break;
+      }
+      fclose(fileOut);
+
+      /*    write file out xi(rp,pi) */
+      if(para.corr == CROSS_WP && para.xi){
+         sprintf(fileOutName, "%s.xi", para.fileOutName);
+         fileOut = fopen(fileOutName,"w");
+         fprintf(fileOut, "# Rows: rp, columns: pi\n#");
+         for(i=0;i<para.nbins;i++) fprintf(fileOut, "%12.7f ", R[i]);
+         fprintf(fileOut, "\n");
+         for(i=0;i<para.nbins;i++){
+            for(j=0;j<para.nbins;j++){
+               fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, j, i, 0));
             }
             fprintf(fileOut, "\n");
          }
-         break;
+         fclose(fileOut);
       }
 
-      fclose(fileOut);
-   }
 
+      /*    write samples */
+      if(para.printSamples){
+         sprintf(fileOutName, "%s.samples", para.fileOutName);
+         fileOut = fopen(fileOutName, "w");
 
-
-
-
-   /* write file out covariance matrix -------------------------------------------------------------- */
-   if(para.cov_mat){
-      double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
-      for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
-      sprintf(fileOutName, "%s.cov", para.fileOutName);
-      fileOut = fopen(fileOutName, "w");
-      for(i=0;i<para.nbins;i++){
-         for(j=0;j<para.nbins;j++){
-            switch(para.corr){
-               case CROSS: case CROSS_3D:
-               for(l=0;l<para.nsamples;l++){
-                  cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1))
-                  *(wmean[j]-wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, j, l+1));
-               }
-               break;
-               case CROSS_WP:
-               for(l=0;l<para.nsamples;l++){
-                  cov[para.nbins*i+j] += norm*(wmean[i]-wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1))
-                  *(wmean[j]-wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, j, l+1));
-               }
-               break;
-            }
-            fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
+         /* Print resampling method */
+         switch(para.err){
+            case JACKKNIFE: fprintf(fileOut, "# Resampling: jackknife (%d samples [=subvolumes]).\n", para.nsamples); break;
+            case BOOTSTRAP: fprintf(fileOut, "# Resampling: bootstrap (%d subvolumes, %d samples).\n", para.nsub, para.nsamples); break;
          }
-         fprintf(fileOut,"\n");
+
+         /* Print bin values */
+         fprintf(fileOut, "#");
+         for(i=0;i<para.nbins;i++){
+            fprintf( fileOut, "%12.7f ", R[i]);
+         }
+         fprintf(fileOut, "\n");
+
+         switch(para.corr){
+            case CROSS: case CROSS_3D:
+               for(l=0;l<para.nsamples;l++){
+                  for(i=0;i<para.nbins;i++){
+                     fprintf(fileOut, "%12.7f ", wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1) );
+                  }
+                  fprintf(fileOut, "\n");
+               }
+               break;
+            case CROSS_WP:
+               for(l=0;l<para.nsamples;l++){
+                  for(i=0;i<para.nbins;i++){
+                     fprintf(fileOut, "%12.7f ", wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1) );
+                  }
+                  fprintf(fileOut, "\n");
+               }
+               break;
+         }
+
+         fclose(fileOut);
       }
-      fclose(fileOut);
-      free(cov);
+
+      /*    write file out covariance matrix */
+      if(para.cov_mat){
+         double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
+         for(i=0;i<para.nbins*para.nbins;i++) cov[i] = 0.0;
+         sprintf(fileOutName, "%s.cov", para.fileOutName);
+         fileOut = fopen(fileOutName, "w");
+         for(i=0;i<para.nbins;i++){
+            for(j=0;j<para.nbins;j++){
+               switch(para.corr){
+                  case CROSS: case CROSS_3D:
+                     for(l=0;l<para.nsamples;l++){
+                        cov[para.nbins*i+j] += norm*(wmean[i]-wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, l+1))
+                        *(wmean[j]-wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, j, l+1));
+                     }
+                     break;
+                  case CROSS_WP:
+                     for(l=0;l<para.nsamples;l++){
+                        cov[para.nbins*i+j] += norm*(wmean[i]-wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, i, l+1))
+                        *(wmean[j]-wp(para, para.estimator, D1D2, R1R2, D1R2, D2R1, -1, j, l+1));
+                     }
+                     break;
+               }
+               fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
+            }
+            fprintf(fileOut,"\n");
+         }
+         fclose(fileOut);
+         free(cov);
+      }
+
+      free(R);
+      free(wmean);
+      free(err_r);
+      free(err_p);
    }
 
-   free(R);
-   free(wmean);
-   free(err_r);
-   free(err_p);
-}
+   if(!strcmp(para.RRInFileName, "") || para.rank == MASTER){
+      freeResult(para, R1R2);
+   }
+   freeResult(para, D1R2);
+   freeResult(para, D2R1);
+   freeResult(para, D1D2);
 
-if(!strcmp(para.RRInFileName, "") || para.rank == MASTER){
-   freeResult(para, R1R2);
-}
-freeResult(para, D1R2);
-freeResult(para, D2R1);
-freeResult(para, D1D2);
-
-return;
+   return;
 }
 
 void ggCorr(Config para){
-   /* Computes the auto correlation function.
-   * for autocorrelation, each cpu correlates all nodes from the root
-   * with all nodes from a subnode (which is only a part of the tree).
-   */
+   /*    Computes the auto correlation function.
+    *    for autocorrelation, each cpu correlates all nodes from the root
+    *    with all nodes from a subnode (which is only a part of the tree).
+    */
 
    int dimStart = 0;
    long i, j, k, l, n;
@@ -1118,7 +1091,7 @@ void ggCorr(Config para){
    char  fileOutName[1000];
    FILE *fileOut;
 
-   /* read files */
+   /*    read files */
    if(para.rank == MASTER){
       comment(para,"Reading sources file..."); source = readCat(para, para.fileInName2, para.data2Id, 0);
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd sources found).\n", source.N);}
@@ -1127,22 +1100,22 @@ void ggCorr(Config para){
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd lenses found).\n", lens.N);}
    }
 
-   /* resampling = build masks TO DO: check that */
+   /*  resampling = build masks TODO: check that */
    comment(para, "Resampling...");
    resample(&para, &source, dimStart, &mask, FIRSTCALL);
 
-   /* send data. Source catalogue is partitioned among cpus */
+   /*    send data. Source catalogue is partitioned among cpus */
    comment(para, "sending data...");
 
    comData(para, &source, para.size, dimStart, FIRSTCALL);
    comData(para, &lens  , 0, dimStart, FIRSTCALL);
 
-   /* grow trees */
+   /*    grow trees */
    comment(para, "building trees...");
    sourceTree = buildTree(&para, &source, &mask, dimStart, FIRSTCALL);   freePoint(para, source);
    lensTree   = buildTree(&para, &lens,   &mask, dimStart, FIRSTCALL);   freePoint(para, lens);
 
-   /* TO FIX */
+   /*    TODO */
    if(para.rank == 0 && para.printTree){
       if(para.verbose) fprintf(stderr,"\n%s: **WARNING** printTree not supported for gglens.\n", MYNAME);
    }
@@ -1155,13 +1128,13 @@ void ggCorr(Config para){
    freeTree(para, sourceTree);
    freeTree(para, lensTree);
 
-   /* each slave sends the result and master sums everything up */
+   /*    each slave sends the result and master sums everything up */
    comResult(para, result, para.size, 0);
 
-   /* print out results */
+   /*    print out results */
    if(para.rank == MASTER){
 
-      /* resampling errors */
+      /*    resampling errors */
       double norm;
       switch(para.err){
          case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
@@ -1230,6 +1203,7 @@ void ggCorr(Config para){
 
       if(para.printSamples){
 
+         /* TODO */
          /*
          sprintf(fileOutName, "%s.samples", para.fileOutName);
          fileOut = fopen(fileOutName, "w");
@@ -1237,12 +1211,9 @@ void ggCorr(Config para){
 
          fclose(fileOut);
          */
-
-         // TO DO
       }
 
-
-      /* covariance matrix */
+      /*    covariance matrix */
       if(para.cov_mat){
          double *cov   = (double *)malloc(para.nbins*para.nbins*sizeof(double));
          sprintf(fileOutName, "%s.cov", para.fileOutName);
@@ -1253,7 +1224,7 @@ void ggCorr(Config para){
                for(l=0;l<para.nsamples;l++){
                   cov[para.nbins*i+j] += norm*(GG_mean[i] + result.GG[para.nbins*(l+1)+i]/result.w[para.nbins*(l+1)+i])*(GG_mean[j] + result.GG[para.nbins*(l+1)+j]/result.w[para.nbins*(l+1)+j]);
                }
-               /* write outfile */
+               /*    write outfile */
                if(result.Nsources[i] > 3.0 && result.Nsources[j] > 3.0){
                   fprintf(fileOut,"%g ", cov[para.nbins*i+j]);
                }else{
@@ -1275,7 +1246,7 @@ void ggCorr(Config para){
 double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R2, Result D2R1, int i, int l){
    /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
 
-   /* initialization */
+   /*    initialization */
    // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
    // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
    // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
@@ -1294,18 +1265,18 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
       && D2R1.NN[para.nbins*l+i] > 0
       && R1R2.NN[para.nbins*l+i] > 0){
          switch(estimator){
-            case LS:  /* Landy and Szalay */
+            case LS:  /*   Landy and Szalay */
             result  =  Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
             result += -Norm2*D1R2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
             result += -Norm3*D2R1.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] + 1.0;
             break;
-            case NAT: /* Natural */
+            case NAT: /*   Natural */
             result = Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] - 1.0;
             break;
-            case HAM: /* Hamilton */
+            case HAM: /*   Hamilton */
             result = Norm4*D1D2.NN[para.nbins*l+i]*R1R2.NN[para.nbins*l+i]/(D1R2.NN[para.nbins*l+i]*D2R1.NN[para.nbins*l+i]) - 1.0;
             break;
-            case PEEBLES: /* Peebles */
+            case PEEBLES: /*  Peebles */
             result = Norm5*D1D2.NN[para.nbins*l+i]/D1R2.NN[para.nbins*l+i] - 1.0;
             break;
          }
@@ -1314,14 +1285,13 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
       return result;
    }
 
-
    double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R2, Result D2R1, int i, int j, int l){
       /* i,j are the bin indexes. i : pi, j : rp.
       if i = -1, integrates over i (pi).
       l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
       double R;
 
-      /* initialization */
+      /*    initialization */
       // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
       // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
       // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
@@ -1343,30 +1313,30 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
 
          if(R1R2.NN[j + para.nbins*(i + para.nbins*l)] > 0){
             switch(estimator){
-               case LS:  /* Landy and Szalay */
+               case LS:  /*   Landy and Szalay */
                result  =  Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
                result += -Norm2*D1R2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)];
                result += -Norm3*D2R1.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)] + 1.0;
                break;
-               case NAT: /* Natural */
+               case NAT: /*    Natural */
                result = Norm1*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/R1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
                break;
-               case HAM: /* Hamilton */
+               case HAM: /*   Hamilton */
                result = Norm4*D1D2.NN[j + para.nbins*(i + para.nbins*l)]*R1R2.NN[j + para.nbins*(i + para.nbins*l)]/(D1R2.NN[j + para.nbins*(i + para.nbins*l)]*D2R1.NN[j + para.nbins*(i + para.nbins*l)]) - 1.0;
                break;
-               case PEEBLES: /* Peebles */
+               case PEEBLES: /*  Peebles */
                result = Norm5*D1D2.NN[j + para.nbins*(i + para.nbins*l)]/D1R2.NN[j + para.nbins*(i + para.nbins*l)] - 1.0;
                break;
             }
          }
          return result;
       }else{
-         /* reset i and integrate over pi (i)*/
-         //i      = 0;
-         // R      = 0.0;
+         /*    reset i and integrate over pi (i)*/
+         // i = 0;
+         // R = 0.0;
          result = 0.0;
 
-         //  while(R < para.pi_max && i < para.nbins){
+         // while(R < para.pi_max && i < para.nbins){
          for(i=0; i<para.nbins; i++){
 
             sum = 0.0;
@@ -1396,7 +1366,7 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
 
             result += 2.0*sum*para.Delta_pi;
 
-            //      i++;
+            // i++;
             /* R */
             // R = 0.0+para.Delta_pi*(double)i;
 
@@ -1407,9 +1377,9 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
 
 
    double xis(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R2, Result D2R1, int i, int l){
-      /* i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
+      /*    i is the bin index. l is sample 0 to 256 (0: no resampling, 1 -> 256: bootstrap or jackknife samples) ) */
 
-      /* initialization */
+      /*    initialization */
       // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
       // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
       // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
@@ -1429,18 +1399,18 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
          && D2R1.NN_s[para.nbins*l+i] > 0
          && R1R2.NN_s[para.nbins*l+i] > 0){
             switch(estimator){
-               case LS:  /* Landy and Szalay */
+               case LS:  /*   Landy and Szalay */
                result  =  Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
                result += -Norm2*D1R2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
                result += -Norm3*D2R1.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] + 1.0;
                break;
-               case NAT: /* Natural */
+               case NAT: /*   Natural */
                result = Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] - 1.0;
                break;
-               case HAM: /* Hamilton */
+               case HAM: /*   Hamilton */
                result = Norm4*D1D2.NN_s[para.nbins*l+i]*R1R2.NN_s[para.nbins*l+i]/(D1R2.NN_s[para.nbins*l+i]*D2R1.NN_s[para.nbins*l+i]) - 1.0;
                break;
-               case PEEBLES: /* Peebles */
+               case PEEBLES: /*  Peebles */
                result = Norm5*D1D2.NN_s[para.nbins*l+i]/D1R2.NN_s[para.nbins*l+i] - 1.0;
                break;
             }
@@ -1453,9 +1423,9 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
       #define node(tree,node) ((tree)->left[(node)] > -1)
 
       Result Nobjects(const Config *para, const Tree *tree1, const long i, int firstCall){
-         /* returns the number of objects in tree1.
-         * Uses random objects to cut the
-         * area into constant parts.
+         /*    returns the number of objects in tree1.
+         *     Uses random objects to cut the
+         *     area into constant parts.
          */
 
          long k = 0, l;
@@ -1468,15 +1438,15 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
             count = 0;
             total = tree1->N[i];
 
-            /* number counts */
+            /*    number counts */
             result.NN = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
             for(k = 0; k < para->nbins*(para->nsamples+1); k++) result.NN[k] = 0;
 
-            /* weighted center of the bin */
+            /*    weighted center of the bin */
             result.meanR = (double *)malloc(para->nbins*sizeof(double));
             for(k = 0; k < para->nbins; k++) result.meanR[k]    = 0.0;
 
-            /* total number of objects per sample */
+            /*    total number of objects per sample */
             result.N1 = (double *)malloc((para->nsamples+1)*sizeof(double));
             result.N2 = (double *)malloc((para->nsamples+1)*sizeof(double));
             result.w  = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
@@ -1485,11 +1455,9 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
             for(l=0;l<para->nsamples;l++){
                result.N1[l+1] = tree1->Ntot[l];
             }
-
-
          }
 
-         /* compute the number of objects recursively */
+         /*    compute the number of objects recursively */
          if(node(tree1, i)){
 
             Nobjects(para, tree1, tree1->left[i],  0);
@@ -1508,17 +1476,16 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
                result.NN[k] +=  1.0*w;
                for(l=0;l<para->nsamples;l++){
 
-                  /* DEBUGGING for SUBSAMPLE
-                  double weight =  tree1->w[para->nsamples*i + l];
-                  if(weight == 0){
+               /* DEBUGGING for SUBSAMPLE
+               double weight =  tree1->w[para->nsamples*i + l];
+               if(weight == 0){
                   weight = 1;
                }else{
-               weight = 0;
-            }
-            result.NN[para->nbins*(l+1) + k] += weight;
-            */
+                  weight = 0;
+               }
+               result.NN[para->nbins*(l+1) + k] += weight;
+               */
             result.NN[para->nbins*(l+1) + k] += tree1->w[para->nsamples*i + l]*w;
-
          }
          result.meanR[k] += NN*w;
       }
@@ -1540,10 +1507,10 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
 
 
 Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall){
-   /* returns the number of pairs if tree1 != tree2, and twice
-   * the number of pairs if tree1 == tree2, so that the treatment of pairs
-   * in w(theta) estimators is identical (numerical trick).
-   */
+   /*    returns the number of pairs if tree1 != tree2, and twice
+    *    the number of pairs if tree1 == tree2, so that the treatment of pairs
+    *    in w(theta) estimators is identical (numerical trick).
+    */
 
    long k = 0, l;
    static Result result;
@@ -1577,10 +1544,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
          result.N2[l+1] = tree2->Ntot[l];
 
       }
-
-
    }
-
 
    if((tree1 == tree2 && i > j) || j < 0) return result;
 
@@ -1601,27 +1565,26 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
       Npairs(para, tree1, i, tree2,  tree2->right[j], 0);
    }else{
 
-
       if(para->corr != AUTO_3D && para->corr != CROSS_3D){
          switch(para->proj){
             case COMO:
-            d  = distComo_tree1*deltaTheta*PI/180.0;              /* Transverse distance in comoving coordinates (Mpc) */
-            break;
+               d  = distComo_tree1*deltaTheta*PI/180.0;              /*    Transverse distance in comoving coordinates (Mpc) */
+               break;
             case PHYS:
-            d  = distComo_tree1*deltaTheta*PI/180.0/(1+z_tree1);  /* Transverse distance in physical coordinates (Mpc) */
-            break;
+               d  = distComo_tree1*deltaTheta*PI/180.0/(1+z_tree1);  /*    Transverse distance in physical coordinates (Mpc) */
+               break;
             case THETA:
-            d = deltaTheta;
-            break;
+               d = deltaTheta;
+               break;
          }
       }else{
          d = deltaTheta;
       }
 
 
-      /* Note: tree->N[i] is the weighted sum of objects so there's no
-      * need to keep track of the sum of the weights, which is simply NN.
-      */
+      /*    Note: tree->N[i] is the weighted sum of objects so there's no
+       *    need to keep track of the sum of the weights, which is simply NN.
+       */
       if(para->log) d = log(d);
       k = floor((d - para->min)/para->Delta);
       if(0 <= k && k < para->nbins){
@@ -1651,10 +1614,10 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
 }
 
 Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall){
-   /* returns the number of pairs if tree1 != tree2, and twice
-   * the number of pairs if tree1 == tree2, so that the treatment of pairs
-   * in w(theta) estimators is identical (numerical trick).
-   */
+   /*    returns the number of pairs if tree1 != tree2, and twice
+    *    the number of pairs if tree1 == tree2, so that the treatment of pairs
+    *    in w(theta) estimators is identical (numerical trick).
+    */
 
    long k = 0, m = 0, p = 0, l;
    static Result result;
@@ -1666,7 +1629,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
       total = tree1->N[i]*tree2->N[j];
       result.NN = (double *)malloc(para->nbins*para->nbins*(para->nsamples+1)*sizeof(double));
       for(k = 0; k < para->nbins*para->nbins*(para->nsamples+1); k++) result.NN[k] = 0.0;
-      /* for xi(s) */
+      /*    for xi(s) */
       result.NN_s = (double *)malloc(para->nbins*(para->nsamples+1)*sizeof(double));
       for(p = 0; p < para->nbins*(para->nsamples+1); p++) result.NN_s[p] = 0.0;
 
@@ -1674,7 +1637,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
       for(k = 0; k < para->nbins; k++){
          result.meanR[k]    = 0.0;
       }
-      /* number of points (used in wTheta(...) for the normalization) */
+      /*    number of points (used in wTheta(...) for the normalization) */
       result.N1 = (double *)malloc((para->nsamples+1)*sizeof(double));
       result.N2 = (double *)malloc((para->nsamples+1)*sizeof(double));
       result.N1[0] = tree1->N[ROOT];
@@ -1711,7 +1674,6 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
 
       pi = ABS(tree1->distComo[i] - tree2->distComo[j]);
       rp = (tree1->distComo[i]+tree2->distComo[j])/2.0*deltaTheta*PI/180.0;
-
 
       // DEBUGGING for wp(r) testing
       //double delx = (tree1->point.x[NDIM*(i)+0] - tree2->point.x[NDIM*(j)+0]);
@@ -1784,7 +1746,7 @@ Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree 
 #undef distComo_tree1
 
 Result gg(const Config *para, const Tree *lens, const long i, const Tree *source, const long j, int firstCall){
-   /* Computes the galaxy-galaxy two-point correlation function. */
+   /*    Computes the galaxy-galaxy two-point correlation function. */
 
    long k;
    double deltaTheta;
@@ -1812,7 +1774,7 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
 
    deltaTheta = para->distAng(lens, &i, source, &j);
 
-   /* correlate if (leaf OR size/d < OA), otherwise go down the tree. Redshift is point.x[NDIM*i + 2] */
+   /*    correlate if (leaf OR size/d < OA), otherwise go down the tree. Redshift is point.x[NDIM*i + 2] */
    if(node(lens, i) && lens->r[i]/deltaTheta > para->OA ) {
       if(node(source, j) && source->r[j]/deltaTheta > para->OA){
          gg(para, lens, lens->left[i],  source, source->left[j],  0);
@@ -1853,15 +1815,15 @@ Result gg(const Config *para, const Tree *lens, const long i, const Tree *source
 #define distComo_source  ((source)->distComo[(j)])
 
 void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *source, long j, double deltaTheta, Result result){
-   /* See Leauthaud et al. (2010),  2010ApJ...709...97L */
+   /*    See Leauthaud et al. (2010),  2010ApJ...709...97L */
 
    double dA, dR, invScaleFac;
    long l, k, zero = 0;
 
-   /* very quick tests? But might be time consuming, too. The key
-   * is to find the best balance...
-   * e.g. if(z_source < z_lens) return;
-   */
+   /*    very quick tests? But might be time consuming, too. The key
+    *    is to find the best balance...
+    *    e.g. if(z_source < z_lens) return;
+    */
 
    switch(para->proj){
       case COMO:
@@ -1876,34 +1838,34 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
       break;
    }
 
-   /* dA = phy_dis/angular_size_in_radians = tran_como_dis/(1+z)*/
-   dA  = distComo_lens/(1.0 + z_lens);               /* Angular diameter distance in physical coordinates */
-   dR  = dA*deltaTheta*PI/180.0;                     /* Transverse distance in phys coordinates (Mpc)     */
-   dR *= invScaleFac;                                /* If coordinate in comoving system, divide by a     */
+   /*    dA = phy_dis/angular_size_in_radians = tran_como_dis/(1+z)*/
+   dA  = distComo_lens/(1.0 + z_lens);               /*  Angular diameter distance in physical coordinates */
+   dR  = dA*deltaTheta*PI/180.0;                     /*  Transverse distance in phys coordinates (Mpc)     */
+   dR *= invScaleFac;                                /*  If coordinate in comoving system, divide by a     */
 
    if(para->log) dR = log(dR);
    k = floor((dR - para->min)/para->Delta);
    if(0 <= k && k < para->nbins && z_source > z_lens + zerr_lens + zerr_source && z_source > zerr_lens + para->deltaz){
 
-      double DOS        = distComo_source;                  /*  this is (tranverse) comoving distance   */
-      double DOL        = distComo_lens;                    /*  but (1+z_source) factors cancel out     */
-      double DLS        = distComo_source - distComo_lens;  /* Approx. Omega_k = 0                      */
-      double SigCritInv = DOL*DLS/DOS/1000.0/(1.0 + z_lens);/* 1/SigCrit in Gpc (1+z) to convert to dA  */
-      SigCritInv       /= 1.663e3;                          /* see Narayan & Bartelmann pge 10          */
-      SigCritInv       *= invScaleFac*invScaleFac;          /* If coordinates in comoving system        */
+      double DOS        = distComo_source;                  /*    this is (tranverse) comoving distance   */
+      double DOL        = distComo_lens;                    /*    but (1+z_source) factors cancel out     */
+      double DLS        = distComo_source - distComo_lens;  /*    Approx. Omega_k = 0                      */
+      double SigCritInv = DOL*DLS/DOS/1000.0/(1.0 + z_lens);/*    1/SigCrit in Gpc (1+z) to convert to dA  */
+      SigCritInv       /= 1.663e3;                          /*    see Narayan & Bartelmann pge 10          */
+      SigCritInv       *= invScaleFac*invScaleFac;          /*    If coordinates in comoving system        */
 
-      /* lensing weight */
+      /*    lensing weight */
       double WW, GG, w   = SigCritInv*SigCritInv*w_source;
 
-      if(para->calib){ /* Compute calibration factor (1+m or c) */
+      if(para->calib){ /*  Compute calibration factor (1+m or c) */
 
          GG = e1_source*w/SigCritInv;
          WW = w/SigCritInv;
          //WW = w;
 
-      }else{           /* Compute gg lensing signal */
+      }else{           /*  Compute gg lensing signal */
 
-         /* Point A --------------------------------- */
+         /*    Point A */
          Point A = createPoint(*para, 1);
          A.x[0]    = RA_source;
          A.x[1]    = DEC_lens;
@@ -1911,7 +1873,7 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
          double AL = distAngPointSpher(para, &A, &zero, &lens->point,   &i);
          freePoint(*para, A);
 
-         /* to get correct sign for phi_gg ---------- */
+         /*       to get correct sign for phi_gg */
          if(RA_source  > RA_lens)  AL = -AL;
          if(DEC_source < DEC_lens) AS = -AS;
 
@@ -1928,21 +1890,21 @@ void corrLensSource(const Config *para, const Tree *lens, long i,const Tree *sou
 
       }
 
-      /* signal */
+      /*    signal */
       result.GG[k] += GG;
       result.w[k]  += WW;
 
-      /* bootstraps */
+      /*    bootstraps */
       for(l=0;l<para->nsamples;l++){
-         /* ATTENTION: source->w and lens->w below are resampling weights (boostrap or jackknife) whereas
-         * w above (namely result.w) is the lensing weight (i.e. shape measurement error
-         * if inverse variance estimate)
-         */
+         /*    ATTENTION: source->w and lens->w below are resampling weights (boostrap or jackknife) whereas
+          *    w above (namely result.w) is the lensing weight (i.e. shape measurement error
+          *    if inverse variance estimate)
+          */
          result.GG[para->nbins*(l+1) + k] += GG*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
          result.w[para->nbins*(l+1) + k]  += WW*lens->w[para->nsamples*i + l]*source->w[para->nsamples*j + l];
       }
 
-      /* keep track of info per bin */
+      /*    keep track of info per bin */
       result.Nsources[k] += 1.0;
       result.meanR[k]    += dR*WW;
    }
@@ -1989,15 +1951,15 @@ void freeResult(const Config para, Result result){
 
 
 
-
-/*----------------------------------------------------------------*
-* MPI routines                                                   *
-*----------------------------------------------------------------*/
+/*
+ *    MPI routines
+ */
 
 #define BASE 200
 void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
-   /* Partitions and sends the data recursively if para.rank == master.
-   * Otherwise receives the data. Then returns the final data */
+   /*    Partitions and sends the data recursively if para.rank == master.
+    *    Otherwise receives the data. Then returns the final data
+    */
 
    MPI_Status status;
 
@@ -2019,7 +1981,7 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
       if(Ncpu > 1){
          splitData(para, *data, dim, &dataLeft, &dataRight);
 
-         /* next splitting coordinate */
+         /*    next splitting coordinate */
          dim++; if(dim > NDIM-1) dim = 0;
 
          switch(PARITY(Ncpu)){
@@ -2045,12 +2007,12 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
             }
 
          }else{
-            /* master can't send data to itself, so we're using a little trick here.
-            * It first recovers the pointers from the first call ("Parent"), then
-            * shifts the data back to the start, and finally reallocates the array
-            * to free the unsused memory (i.e. data sent to other cpus).
-            * Note: memmove() is safer than memcpy().
-            */
+            /*    master can't send data to itself, so we're using a little trick here.
+             *    It first recovers the pointers from the first call ("Parent"), then
+             *    shifts the data back to the start, and finally reallocates the array
+             *    to free the unsused memory (i.e. data sent to other cpus).
+             *    Note: memmove() is safer than memcpy().
+             */
 
             dataParent->x = (double *)memmove(dataParent->x, data->x, data->N*NDIM*sizeof(double));
             dataParent->w    = (double *)memmove(dataParent->w,    data->w ,   data->N*sizeof(double));
@@ -2067,15 +2029,15 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
                dataParent->e2   = (double *)realloc(dataParent->e2,   data->N*sizeof(double));
             }
 
-            /* copy the new number of points and the dim
-            * along which they are sorted
-            */
+            /*    copy the new number of points and the dim
+             *    along which they are sorted
+             */
             dataParent->N   = data->N;
             dataParent->dim = dim;
          }
 
          rank--;
-         /* call recursively to transmit the entire data set to all cpus without further splitting */
+         /*    call recursively to transmit the entire data set to all cpus without further splitting */
          if(Ncpu == 0 && rank >= 0) comData(para, data, 0, dim, 0);
       }
 
@@ -2107,11 +2069,11 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
 
 #define BASE 300
 void comResult(const Config para, Result result, long Ncpu, int split){
-   /* Sends results back to master if slave. Sums up everything if master. If
-   * split is larger than 0, it means the data has been split before building
-   * the tree, hence it requires to sum up the total number of objects as well,
-   * but only N2, because N1 is never partitioned.
-   */
+   /*    Sends results back to master if slave. Sums up everything if master. If
+    *    split is larger than 0, it means the data has been split before building
+    *    the tree, hence it requires to sum up the total number of objects as well,
+    *    but only N2, because N1 is never partitioned.
+    */
    long i, rank;
 
    if(para.rank != MASTER){

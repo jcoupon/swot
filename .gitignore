@@ -4,8 +4,8 @@
 
 # for C
 
-# test/data
-test/results
+test
+test
 
 # Object files
 *.o
