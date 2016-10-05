@@ -75,7 +75,7 @@ char **argv;
          ggCorr(para);
          break;
       case NUMBER :
-         /* number counts */
+         /*    number counts */
          numberCount(para);
          break;
    }
@@ -90,9 +90,9 @@ char **argv;
    return EXIT_SUCCESS;
 }
 
-/*----------------------------------------------------------------*
-*Main routines                                                   *
-*----------------------------------------------------------------*/
+/*
+ *    Main routines
+ */
 
 void numberCount(Config para){
    /*    Computes the number of objects
