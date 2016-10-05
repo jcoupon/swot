@@ -29,14 +29,5 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
 Result Npairs3D(const Config *para, const Tree *tree1, const long i, const Tree *tree2, const long j, int firstCall);
 Result gg(const Config *para,const Tree *lens, const long i, const Tree *source, const long j, int firstCall);
 void corrLensSource(const Config *para, const Tree *lens, long i, const Tree *source, long j, double deltaTheta, Result result);
-void freeResult(const Config para, Result result);
-
-/*
- *    MPI routines
- */
-
-void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall);
-void comResult(const Config para, Result result, long Ncpu, int split);
-
 
 #endif
