@@ -23,7 +23,7 @@ SRC         = main.c
 OBJ         = $(SRC:.c=.o)
 
 # source files
-SRCS    = utils.c tree.c init.c  main.c
+SRCS    = utils.c tree.c init.c  correlators.c main.c
 OBJS    = $(SRCS:.c=.o)
 
 # Headers for libraries

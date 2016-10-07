@@ -707,25 +707,25 @@ void comResult(const Config para, Result result, long Ncpu, int split){
    if(para.rank != MASTER){
       switch(para.corr){
          case AUTO: case CROSS: case AUTO_3D: case CROSS_3D: case NUMBER:
-         MPI_Send(result.NN, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
-         MPI_Send(result.N1, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
-         MPI_Send(result.N2, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
-         MPI_Send(result.meanR,   para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
-         break;
+	         MPI_Send(result.NN, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
+	         MPI_Send(result.N1, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
+	         MPI_Send(result.N2, para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
+	         MPI_Send(result.meanR,   para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
+	         break;
          case GGLENS:
-         MPI_Send(result.GG, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
-         MPI_Send(result.w,  para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
-         MPI_Send(result.Nsources, para.nbins, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
-         MPI_Send(result.meanR,    para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
-         MPI_Send(result.e2,       para.nbins, MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
-         break;
+	         MPI_Send(result.GG, para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
+	         MPI_Send(result.w,  para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
+	         MPI_Send(result.Nsources, para.nbins, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
+	         MPI_Send(result.meanR,    para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
+	         MPI_Send(result.e2,       para.nbins, MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
+	         break;
          case AUTO_WP: case CROSS_WP:
-         MPI_Send(result.NN,    para.nbins*para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
-         MPI_Send(result.N1,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
-         MPI_Send(result.N2,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
-         MPI_Send(result.meanR, para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
-         MPI_Send(result.NN_s,  para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
-         break;
+	         MPI_Send(result.NN,    para.nbins*para.nbins_pi*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+0, MPI_COMM_WORLD);
+	         MPI_Send(result.N1,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+1, MPI_COMM_WORLD);
+	         MPI_Send(result.N2,    para.nsamples+1, MPI_DOUBLE, MASTER, BASE+2, MPI_COMM_WORLD);
+	         MPI_Send(result.meanR, para.nbins, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD);
+	         MPI_Send(result.NN_s,  para.nbins*(para.nsamples+1), MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD);
+	         break;
       }
    }else{
 
@@ -734,71 +734,71 @@ void comResult(const Config para, Result result, long Ncpu, int split){
 
       switch(para.corr){
          case AUTO: case CROSS: case AUTO_3D: case CROSS_3D:  case NUMBER:
-         slave.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(long));
-         slave.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
-         slave.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
-         slave.meanR = (double *)malloc(para.nbins*sizeof(double));
-         for(rank=1;rank<Ncpu;rank++){
-            MPI_Recv(slave.NN,    para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
-            for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
-            for(i=0;i<para.nbins;i++){
-               result.meanR[i]    += slave.meanR[i];
-            }
-            if(split){
-               /* only N2 may be partitioned */
-               for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
-            }
-         }
-         break;
+	         slave.NN    = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(long));
+	         slave.N1    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	         slave.N2    = (double *)malloc((para.nsamples+1)*sizeof(double));
+	         slave.meanR = (double *)malloc(para.nbins*sizeof(double));
+	         for(rank=1;rank<Ncpu;rank++){
+	            MPI_Recv(slave.NN,    para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
+	            for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
+	            for(i=0;i<para.nbins;i++){
+	               result.meanR[i]    += slave.meanR[i];
+	            }
+	            if(split){
+	               /* only N2 may be partitioned */
+	               for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
+	            }
+	         }
+	         break;
          case GGLENS:
-         slave.GG       = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
-         slave.w        = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
-         slave.Nsources = (double *)malloc(para.nbins*sizeof(double));
-         slave.meanR    = (double *)malloc(para.nbins*sizeof(double));
-         slave.e2       = (double *)malloc(para.nbins*sizeof(double));
-         for(rank=1;rank<Ncpu;rank++){
-            MPI_Recv(slave.GG, para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.w,  para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.Nsources, para.nbins, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.meanR,    para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.e2,       para.nbins, MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD, &status);
-            for(i=0;i<para.nbins*(para.nsamples+1);i++){
-               result.GG[i] += slave.GG[i];
-               result.w[i]  += slave.w[i];
-            }
-            for(i=0;i<para.nbins;i++){
-               result.Nsources[i] += slave.Nsources[i];
-               result.meanR[i]    += slave.meanR[i];
-               result.e2[i]       += slave.e2[i];
-            }
-         }
-         break;
+	         slave.GG       = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+	         slave.w        = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+	         slave.Nsources = (double *)malloc(para.nbins*sizeof(double));
+	         slave.meanR    = (double *)malloc(para.nbins*sizeof(double));
+	         slave.e2       = (double *)malloc(para.nbins*sizeof(double));
+	         for(rank=1;rank<Ncpu;rank++){
+	            MPI_Recv(slave.GG, para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.w,  para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.Nsources, para.nbins, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.meanR,    para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.e2,       para.nbins, MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD, &status);
+	            for(i=0;i<para.nbins*(para.nsamples+1);i++){
+	               result.GG[i] += slave.GG[i];
+	               result.w[i]  += slave.w[i];
+	            }
+	            for(i=0;i<para.nbins;i++){
+	               result.Nsources[i] += slave.Nsources[i];
+	               result.meanR[i]    += slave.meanR[i];
+	               result.e2[i]       += slave.e2[i];
+	            }
+	         }
+	         break;
          case AUTO_WP: case CROSS_WP:
-         slave.NN = (double *)malloc(para.nbins*para.nbins*(para.nsamples+1)*sizeof(double));
-         slave.N1 = (double *)malloc((para.nsamples+1)*sizeof(double));
-         slave.N2 = (double *)malloc((para.nsamples+1)*sizeof(double));
-         slave.meanR = (double *)malloc(para.nbins*para.nbins*sizeof(double));
-         slave.NN_s = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
-         for(rank=1;rank<Ncpu;rank++){
-            MPI_Recv(slave.NN,    para.nbins*para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
-            MPI_Recv(slave.NN_s,  para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD, &status);
-            for(i=0;i<para.nbins*para.nbins*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
-            for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN_s[i] += slave.NN_s[i];
-            for(i=0;i<para.nbins;i++){
-               result.meanR[i] += slave.meanR[i];
-            }
-            if(split){
-               /* only N2 may be partitioned */
-               for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
-            }
-         }
-         break;
+	         slave.NN = (double *)malloc(para.nbins*para.nbins_pi*(para.nsamples+1)*sizeof(double));
+	         slave.N1 = (double *)malloc((para.nsamples+1)*sizeof(double));
+	         slave.N2 = (double *)malloc((para.nsamples+1)*sizeof(double));
+	         slave.meanR = (double *)malloc(para.nbins*sizeof(double));
+	         slave.NN_s = (double *)malloc(para.nbins*(para.nsamples+1)*sizeof(double));
+	         for(rank=1;rank<Ncpu;rank++){
+	            MPI_Recv(slave.NN,    para.nbins*para.nbins_pi*(para.nsamples+1), MPI_DOUBLE, rank, BASE+0, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.N1,    para.nsamples+1, MPI_DOUBLE, rank, BASE+1, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.N2,    para.nsamples+1, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.meanR, para.nbins, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD, &status);
+	            MPI_Recv(slave.NN_s,  para.nbins*(para.nsamples+1), MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD, &status);
+	            for(i=0;i<para.nbins*para.nbins_pi*(para.nsamples+1);i++) result.NN[i] += slave.NN[i];
+	            for(i=0;i<para.nbins*(para.nsamples+1);i++) result.NN_s[i] += slave.NN_s[i];
+	            for(i=0;i<para.nbins;i++){
+	               result.meanR[i] += slave.meanR[i];
+	            }
+	            if(split){
+	               /* only N2 may be partitioned */
+	               for(i=0;i<para.nsamples+1;i++) result.N2[i] += slave.N2[i];
+	            }
+	         }
+	         break;
          freeResult(para, slave);
       }
    }

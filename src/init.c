@@ -129,6 +129,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          printf("est            ls\t # Estimator [ls,nat,ham,peebles]\n");
          printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
          printf("nbins          %d\t # Number of bins\n", para->nbins);
+         printf("nbins_pi       %d\t # Number of bins for pi (for wp)\n", para->nbins_pi);
          printf("log            yes\t # Logarithmic bins [yes,no]\n");
          printf("err            jackknife # Resampling method [bootstrap,jackknife,subsample]\n");
          printf("                         # or [bootstrap2D,jackknife2D]\n");
@@ -243,7 +244,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
 
    /* wp(rp) integrated along pi in linear scale */
    // DEBUGGING para->Delta_pi = (para->max - para->min)/(double)para->nbins;
-   para->Delta_pi = (para->pi_max - 0.0)/(double)para->nbins;
+   para->Delta_pi = (para->pi_max - 0.0)/(double)para->nbins_pi;
 
    // TODO: check that all columns are defined (including for randoms)
 
@@ -354,6 +355,9 @@ void setPara(char *field, char *arg, Config *para){
 }else if(!strcmp(field,"nbins")){
    checkArg(field,arg,para);
    para->nbins = atoi(arg);
+}else if(!strcmp(field,"nbins_pi")){
+   checkArg(field,arg,para);
+   para->nbins_pi = atoi(arg);
 }else if(!strcmp(field,"log")){
    checkArg(field,arg,para);
    if(!strcmp(arg,"yes")) para->log = 1;
