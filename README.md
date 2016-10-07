@@ -123,6 +123,7 @@ The input format is set with the `cols[1,2]` and `rancols[1,2]` options (the fir
 ### bin configuration
 
 `-nbins`: controls the number of bins.
+
 `-nbins_pi`: controls the number of bins in the "pi" direction for wp(rp).
 
 
