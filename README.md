@@ -120,6 +120,10 @@ The input format is set with the `cols[1,2]` and `rancols[1,2]` options (the fir
 
 * default input format for `gglens` to compute calibration factor (`-calib yes`). Lenses (`-cols1`) `RA DEC z sigz`. Change column ids with: `-cols1 1,2,3,4`. Sources (`-cols2`) `RA DEC z sigz calib e2 weight`. Change column ids with: `-cols2 1,2,3,4,5,6,7`, where calib = 1+m or c.
 
+### bin configuration
+
+`-nbins`: controls the number of bins.
+`-nbins_pi`: controls the number of bins in the "pi" direction for wp(rp).
 
 
 ## Memory usage
