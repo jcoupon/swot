@@ -1,5 +1,10 @@
 Version history
 
+v 1.2 [Jean]
+- added the nbins_pi option
+- did some code cleaning
+- split main.c into strucuted file system
+
 v 1.1.2 [Jean]
 - replaced D1R1 and D2R2 in LS, Hamilton and Peebles
 estimator upon Elinor Medezinski's suggestion
