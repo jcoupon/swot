@@ -35,7 +35,7 @@ If you use this software, please cite [Coupon et al. (2012, A&A, 542A, 5)](http:
 
 To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), install OPEN MPI with the following command:
 ``` bash
-./configure --prefix=YOUR/PATH CC=icc CXX=icpc
+$ ./configure --prefix=YOUR/PATH CC=icc CXX=icpc
 ```
 
 To download and install GSL, please visit http://www.gnu.org/software/gsl/.
@@ -51,7 +51,7 @@ To download and install CFITSIO, please visit http://heasarc.gsfc.nasa.gov/docs/
 
 If OPEN MPI or GSL are installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly, or run:
 ``` bash
-make GSL=path/to/gsl MPI=path/to/mpi
+$ make GSL=path/to/gsl MPI=path/to/mpi
 ```
 
 The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variable or move `swot` to your working directory.
@@ -65,12 +65,12 @@ The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variab
 
 Run the software:
 ```
-	mpirun -np [Ncpu] swot -c configFile -corr ESTIMATOR [options]:
+$ mpirun -np [Ncpu] swot -c configFile -corr ESTIMATOR [options]:
 ```
 
 Display the default configuration file:
 ```
-   swot -d: display a default configuration file
+$ swot -d: display a default configuration file
 ```
 
 *Important*: if using "RADEC" coordinates, the angle in the input catalogues must be in decimal degrees.
