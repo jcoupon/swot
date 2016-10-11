@@ -25,7 +25,7 @@ Contributions:
 - the galaxy-galaxy lensing core algorithm is based on Alexie Leauthaud's code (Leauthaud et al. 2010, ApJ, 709, 97).
 - Elinor Medezinski helped improving and correcting a number of bugs in the cross-correlation module.
 
-If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5): http://adsabs.harvard.edu/abs/2012A%26A...542A...5C. A static link is also available at http://jeancoupon.com/swot.
+If you use this software, please cite [Coupon et al. (2012, A&A, 542A, 5)](http://adsabs.harvard.edu/abs/2012A%26A...542A...5C). A static link is also available at http://jeancoupon.com/swot.
 
 ## Installation
 
