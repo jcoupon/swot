@@ -126,6 +126,13 @@ The input format is set with the `cols[1,2]` and `rancols[1,2]` options (the fir
 
 `-nbins_pi`: controls the number of bins in the "pi" direction for wp(rp).
 
+### tree and weights
+
+`printTree`: outputs the tree structure in "out".data[1,2]\_tree.[ascii,fits]. Output format in ascii or fits, depending on input file format. The recorded columns are "dim1 dim2 ... dimNDIM weight1 weight2 ... weigntNsamples rank".
+
+`printTreeAndExit`: same as above but exists after.
+
+
 
 ## Memory usage
 

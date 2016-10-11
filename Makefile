@@ -1,5 +1,9 @@
 # Makefile for swot
 
+# Where cfitsio library is installed
+CFITSIO =  #/usr/local
+
+
 # Where GSL library is installed
 GSL =  #/usr/local
 
@@ -14,7 +18,7 @@ else
 endif
 
 CFLAGS      = -Iinclude # -use-asm # for old icc versions
-LDFLAGS     =  -lgsl -lgslcblas -lm
+LDFLAGS     =  -lgsl -lgslcblas -lm -lcfitsio
 MPI_CFLAGS  =
 MPI_LFLAGS  =
 RM          = rm -f
@@ -27,6 +31,10 @@ SRCS    = utils.c tree.c init.c  correlators.c main.c
 OBJS    = $(SRCS:.c=.o)
 
 # Headers for libraries
+ifneq ($(CFITSIO), )
+	CFLAGS     +=  -I$(CFITSIO)/include
+	LDFLAGS    +=  -L$(CFITSIO)/lib
+endif
 
 ifneq ($(GSL), )
 	CFLAGS     +=  -I$(GSL)/include

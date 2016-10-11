@@ -138,8 +138,6 @@ long lowestPowerOfTwo(long n, long *pow){
 }
 
 
-
-
 void comment(const Config para, char *commentString){
    if(para.verbose){
       fflush(stderr);
@@ -148,6 +146,22 @@ void comment(const Config para, char *commentString){
    }
    return;
 }
+
+
+
+
+int checkFileExt(const char *s1, const char *s2){
+  /*Checks if s2 matches s1 extension*/
+
+  int ext = strlen(s1) - strlen(s2);
+
+  if(strcmp(s1+ext, s2) == 0){
+    return 1;
+  }else{
+    return 0;
+  }
+}
+
 
 
 
@@ -426,67 +440,142 @@ void freePoint(const Config para, Point point){
    return;
 }
 
-Point readCat(const Config para, char *fileInName, int id[NIDSMAX], int weighted){
-   /* Reads fileIn and returns the data array
-   * (see header file for details about the
-   * data structure.
-   */
-   long n, N, dim, Ncol;
+
+Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weighted){
+   /* 	Reads fileIn and returns the data array
+    * 	(see header file for details about the
+    * 	data structure.
+    * 	See http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html for fits syntax
+	 */
+
+   long j, n, N, dim, Ncol, repeat, width;
+	int anynul;
    char line[NFIELD*NCHAR], item[NFIELD*NCHAR];
+	Point data;
 
-   FILE *fileIn = fopenAndCheck(fileInName, "r", para.verbose);
+	if (para.fits){
 
-   /* get size of file and allocate data */
-   N = 0;
-   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL)
-   if(*(line) != '#' && *(line) != '\0' && *(line) != '\n') N++;
-   rewind(fileIn);
+		fitsfile *fileIn;
 
-   if(N < para.size){
-      /* if no point found in fileIn or if the number of
-      * points is less than the number of cpu (who knows...)
-      */
-      if(para.verbose) fprintf(stderr,"\n%s: **WARNING** the number of points is lower than the number of cpus.\n", MYNAME);
-      //  exit(EXIT_FAILURE);
-   }
+		int status = 0, datatype, id_num[NIDSMAX]; /* MUST initialize status */
+		fits_open_table(&fileIn, fileInName, READONLY, &status);
+		if (status) /* print any error messages */ fits_report_error(stderr, status);
 
-   Point data = createPoint(para, N);
+		/* convert column names into column numbers if required */
+      for(j=0;j<NIDSMAX;j++) {
+			id_num[j] = atoi(id[j]);
+			if(id_num[j] == 0){ /* if input column name is a string */
+				fits_get_colnum(fileIn, CASEINSEN, id[j], &(id_num[j]), &status);
+				if (status) /* print any error messages */ fits_report_error(stderr, status);
+			}
+		}
 
-   n = 0;
-   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL){
+		fits_get_num_rows(fileIn, &N, &status);
+		if (status) /* print any error messages */ fits_report_error(stderr, status);
 
-      if(getStrings(line,item," ",&Ncol)){
-         /* read the value at the column definied by "id[i]" */
-         for(dim=0;dim<NDIM;dim++) data.x[NDIM*n+dim] = getDoubleValue(item,id[dim]);
-         if(weighted){
-            data.w[n] = getDoubleValue(item,id[NDIM+0]);
-         }else{
-            data.w[n] = 1.0;
-         }
-         if(para.corr == GGLENS){
-            Ncol -= 4;
-            //Check for positive values here ??
-            data.zerr[n] = getDoubleValue(item,id[NDIM+0]);
-            data.e1[n]   = getDoubleValue(item,id[NDIM+1]);
-            data.e2[n]   = getDoubleValue(item,id[NDIM+2]);
-            data.w[n]    = getDoubleValue(item,id[NDIM+3]);
-         }
-         if(Ncol < NDIM){
-            /*
-            if(para.verbose){
-            fprintf(stderr,"\n%s: **ERROR** (row %zd), the number of columns is less than expected. Check configuration or input file. Exiting...\n", MYNAME, n+1);
-         }
+	   data = createPoint(para, N);
+	   for(dim=0;dim<NDIM;dim++) {
+			/* get colum format */
+			fits_get_coltype(fileIn, id_num[dim], &datatype, &repeat, &width, &status);
+			for(n=0;n<N;n++){
+				fits_read_col(fileIn, datatype, id_num[dim], n+1, 1, 1, NULL, &(data.x[NDIM*n+dim]), &anynul, &status);
+			}
+			if (status) /* print any error messages */ fits_report_error(stderr, status);
+		}
+		if(weighted){
+			fits_get_coltype(fileIn, id_num[NDIM+0], &datatype, &repeat, &width, &status);
+			for(n=0;n<N;n++){
+				fits_read_col(fileIn, datatype, id_num[NDIM+0], n+1, 1, 1, NULL, &(data.w[n]), &anynul, &status);
+			}
+			if (status) /* print any error messages */ fits_report_error(stderr, status);
+		}else{
+			for(n=0;n<N;n++){ data.w[n] = 1.0; };
+		}
+		if(para.corr == GGLENS){
+			fits_get_coltype(fileIn, id_num[NDIM+0], &datatype, &repeat, &width, &status);
+			for(n=0;n<N;n++){
+				fits_read_col(fileIn, datatype, id_num[NDIM+0], n+1, 1, 1, NULL, &(data.zerr[n]), &anynul, &status);
+			}
+			if (status) /* print any error messages */ fits_report_error(stderr, status);
 
-         exit(EXIT_FAILURE);
-         */
-      }
-      /* increment n */
-      n++;
-   }
-}
+			fits_get_coltype(fileIn, id_num[NDIM+1], &datatype, &repeat, &width, &status);
+			for(n=0;n<N;n++){
+				fits_read_col(fileIn, datatype, id_num[NDIM+1], n+1, 1, 1, NULL, &(data.e1[n]), &anynul, &status);
+			}
+			if (status) /* print any error messages */ fits_report_error(stderr, status);
 
-fclose(fileIn);
-return data;
+			fits_get_coltype(fileIn, id_num[NDIM+2], &datatype, &repeat, &width, &status);
+			for(n=0;n<N;n++){
+				fits_read_col(fileIn, datatype, id_num[NDIM+2], n+1, 1, 1, NULL, &(data.e2[n]), &anynul, &status);
+			}
+			if (status) /* print any error messages */ fits_report_error(stderr, status);
+
+			fits_get_coltype(fileIn, id_num[NDIM+3], &datatype, &repeat, &width, &status);
+			for(n=0;n<N;n++){
+				fits_read_col(fileIn, datatype, id_num[NDIM+3], n+1, 1, 1, NULL, &(data.w[n]), &anynul, &status);
+			}
+			if (status) /* print any error messages */ fits_report_error(stderr, status);
+		}
+
+		fits_close_file(fileIn, &status);
+		if (status) /* print any error messages */ fits_report_error(stderr, status);
+
+		return data;
+	}else{
+
+	   FILE *fileIn = fopenAndCheck(fileInName, "r", para.verbose);
+
+	   /* get size of file and allocate data */
+	   N = 0;
+	   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL)
+	   if(*(line) != '#' && *(line) != '\0' && *(line) != '\n') N++;
+	   rewind(fileIn);
+
+	   if(N < para.size){
+	      /* if no point found in fileIn or if the number of
+	      * points is less than the number of cpu (who knows...)
+	      */
+	      if(para.verbose) fprintf(stderr,"\n%s: **WARNING** the number of points is lower than the number of cpus.\n", MYNAME);
+	      //  exit(EXIT_FAILURE);
+	   }
+
+	   data = createPoint(para, N);
+
+	   n = 0;
+	   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL){
+
+	      if(getStrings(line,item," ",&Ncol)){
+	         /* read the value at the column definied by "id[i]" */
+	         for(dim=0;dim<NDIM;dim++) data.x[NDIM*n+dim] = getDoubleValue(item, atoi(id[dim]));
+	         if(weighted){
+	            data.w[n] = getDoubleValue(item,atoi(id[NDIM+0]));
+	         }else{
+	            data.w[n] = 1.0;
+	         }
+	         if(para.corr == GGLENS){
+	            Ncol -= 4;
+	            //Check for positive values here ??
+	            data.zerr[n] = getDoubleValue(item, atoi(id[NDIM+0]));
+	            data.e1[n]   = getDoubleValue(item, atoi(id[NDIM+1]));
+	            data.e2[n]   = getDoubleValue(item, atoi(id[NDIM+2]));
+	            data.w[n]    = getDoubleValue(item, atoi(id[NDIM+3]));
+	         }
+	         if(Ncol < NDIM){
+	            /*
+	            if(para.verbose){
+	            fprintf(stderr,"\n%s: **ERROR** (row %zd), the number of columns is less than expected. Check configuration or input file. Exiting...\n", MYNAME, n+1);
+	         }
+	         exit(EXIT_FAILURE);
+	         */
+		      }
+		      /* increment n */
+		      n++;
+		   }
+		}
+		fclose(fileIn);
+	}
+
+	return data;
 }
 
 
@@ -552,8 +641,6 @@ double dist3D(const Tree *a, const long *i, const Tree *b, const long *j){
 
    return sqrt(d0*d0 + d1*d1 + d2*d2);
 }
-
-
 
 
 /*

@@ -1,5 +1,10 @@
 Version history
 
+v 1.3 [Jean]
+- added input file fits support
+- added output tree fits support
+- added printTreeAndExit option
+
 v 1.2 [Jean]
 - added the nbins_pi option
 - did some code cleaning

@@ -17,7 +17,7 @@
 #include <stdarg.h>
 #include "mpi.h"
 #include <gsl/gsl_integration.h>
-
+#include "fitsio.h"
 
 /* 	useful constants */
 #define PI    3.14159265358979323846
@@ -175,43 +175,50 @@ typedef struct Result
 /* 	config structure */
 typedef struct Config
 {
-  /* 		correlation function options.
-   * 		Default proj(ection) for gg lensing is
-   * 		comoving (COMO), for auto.cross is theta (THETA).
-   * 		Change to PHYS for physical coordinates*/
-  int cov_mat, estimator, nbins, nbins_pi,
-    corr,  log, Ninfo, proj, xi, weighted, calib,  resample2D;
-  double deltaz, min, max, Delta, Delta_pi, OA, pi_max;
+	/* 		correlation function options.
+	 * 		Default proj(ection) for gg lensing is
+	 * 		comoving (COMO), for auto.cross is theta (THETA).
+	 * 		Change to PHYS for physical coordinates*/
+	int cov_mat, estimator, nbins, nbins_pi,
+	 corr,  log, Ninfo, proj, xi, weighted, calib,  resample2D;
+	double deltaz, min, max, Delta, Delta_pi, OA, pi_max;
 
-  /* 		error method JACKKNIFE or BOOTSTRAP */
-  int err, nsamples, nsub;
+	/* 		error method JACKKNIFE or BOOTSTRAP */
+	int err, nsamples, nsub;
 
-  /* 		Print tree */
-  int printTree;
+	/*	 	fits files */
+	int fits;
 
-  /* 		seed */
-  size_t seed;
+	/* 		Print tree */
+	int printTree, printTreeAndExit;
 
-  /* 		write samples in files*/
-  int printSamples;
+	/* 		seed */
+	size_t seed;
 
-  /* 		cosmology */
-  double a[4];
+	/* 		write samples in files*/
+	int printSamples;
 
-  /* 		for mpi */
-  int rank, size, verbose;
+	/* 		cosmology */
+	double a[4];
 
-  /* 		input and output files information */
-  char fileInName1[1000],  fileInName2[1000];
-  char fileRanName1[1000], fileRanName2[1000];
-  char fileOutName[1000],  RRInFileName[1000], RROutFileName[1000];
+	/* 		for mpi */
+	int rank, size, verbose;
 
-  /* 		column ids for input files */
-  int data1Id[NIDSMAX], data2Id[NIDSMAX];
-  int  ran1Id[NIDSMAX], ran2Id[NIDSMAX];
+	/* 		input and output files information */
+	char fileInName1[1000],  fileInName2[1000];
+	char fileRanName1[1000], fileRanName2[1000];
+	char fileOutName[1000],  RRInFileName[1000], RROutFileName[1000];
 
-  /* 		angular separation function distAng[Spher,Cart] */
-  double (*distAng)(const Tree *a, const long *i, const Tree *b, const long *j);
+	/* 		column ids for input files */
+	// int data1Id[NIDSMAX], data2Id[NIDSMAX];
+	// int  ran1Id[NIDSMAX], ran2Id[NIDSMAX];
+	char *data1Id[NIDSMAX];
+	char *data2Id[NIDSMAX];
+	char *ran1Id[NIDSMAX];
+	char *ran2Id[NIDSMAX];
+
+	/* 		angular separation function distAng[Spher,Cart] */
+	double (*distAng)(const Tree *a, const long *i, const Tree *b, const long *j);
 
 } Config;
 
@@ -229,6 +236,7 @@ long randInt(long N);
 void printCount(const long count, const long total, const long step, int verbose);
 long lowestPowerOfTwo(long n, long *pow);
 void comment(const Config para, char *commentString);
+int checkFileExt(const char *s1, const char *s2);
 
 
 /*
@@ -243,7 +251,7 @@ void copyPoint(const Config para, Point a, long i, Point b, long j);
 void copyPointAddress(const Config para, Point *a, Point b, long shift);
 void getMeanPoint(const Config para, Point a, long i, Point point);
 void swapPoint(const Config para, Point point,long i, long j);
-Point readCat(const Config para, char *fileInName, int id[NIDSMAX], int weighted);
+Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weighted);
 
 double distAngPointCart(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double distAngPointSpher(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
@@ -260,6 +268,8 @@ double dist3D(const Tree *a, const long *i, const Tree *b, const long *j);
 void freeResult(const Config para, Result result);
 void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall);
 void comResult(const Config para, Result result, long Ncpu, int split);
+
+
 
 
 

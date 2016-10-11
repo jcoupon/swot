@@ -131,12 +131,15 @@ void numberCount(Config para){
    /*    grow trees */
    comment(para, "building trees...");
    dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
-   comment(para, "done.\n");
 
    /*    Output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
-   if(para.rank == 0 && para.printTree){
+   if(para.rank == 0 && (para.printTree || para.printTreeAndExit)){
       sprintf(fileOutName, "%s.data.tree", para.fileOutName);
       printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+   }
+   comment(para, "done.\n");
+   if(para.printTreeAndExit){
+      return;
    }
 
    /*    divide and conquer */
@@ -295,17 +298,25 @@ void autoCorr(Config para){
    comment(para, "building trees...");
    randomTree = buildTree(&para, &random, &mask, dimStart, FIRSTCALL);   freePoint(para, random);
    dataTree   = buildTree(&para, &data, &mask, dimStart, FIRSTCALL);     freePoint(para, data);
-   comment(para, "done.\n");
 
    /*    divide and conquer */
    long nodeSlaveRan  = splitTree(&para, &randomTree, ROOT, para.size, FIRSTCALL);
    long nodeSlaveData = splitTree(&para, &dataTree,   ROOT, para.size, FIRSTCALL);
 
    /*    output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
-   if(para.rank == 0 && para.printTree){
-      sprintf(fileOutName, "%s.data.tree", para.fileOutName);
-      printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
-      //exit(-1);
+   if(para.rank == 0 && (para.printTree || para.printTreeAndExit)){
+      comment(para, "writing trees...");
+      if(para.fits){
+         sprintf(fileOutName, "!%s.data1_tree.fits", para.fileOutName);
+         printTreeFits(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+      }else{
+         sprintf(fileOutName, "%s.data1_tree.ascii", para.fileOutName);
+         printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+      }
+   }
+   comment(para, "done.\n");
+   if (para.printTreeAndExit){
+      return;
    }
 
    /*    compute pairs */
@@ -710,16 +721,19 @@ void crossCorr(Config para){
    randomTree2 = buildTree(&para, &random2, &mask, dimStart, FIRSTCALL);   freePoint(para, random2);
    dataTree1   = buildTree(&para, &data1, &mask, dimStart, FIRSTCALL);     freePoint(para, data1);
    dataTree2   = buildTree(&para, &data2, &mask, dimStart, FIRSTCALL);     freePoint(para, data2);
-   comment(para, "done.\n");
 
    /*    Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank */
-   if(para.rank == 0 && para.printTree){
+   if(para.rank == 0 && (para.printTree || para.printTreeAndExit)){
 
       sprintf(fileOutName, "%s.data1.tree", para.fileOutName);
       printTree(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
 
       sprintf(fileOutName, "%s.data2.tree", para.fileOutName);
       printTree(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
+   }
+   comment(para, "done.\n");
+   if(para.printTreeAndExit){
+      return;
    }
 
    /*    divide and conquer */
@@ -1123,11 +1137,14 @@ void ggCorr(Config para){
    lensTree   = buildTree(&para, &lens,   &mask, dimStart, FIRSTCALL);   freePoint(para, lens);
 
    /*    TODO */
-   if(para.rank == 0 && para.printTree){
+   if(para.rank == 0 && (para.printTree || para.printTreeAndExit)){
       if(para.verbose) fprintf(stderr,"\n%s: **WARNING** printTree not supported for gglens.\n", MYNAME);
    }
-
    comment(para, "done.\n");
+   if(para.printTreeAndExit){
+      return;
+   }
+
    comment(para, "Correlating lenses with sources...       ");
    result = gg(&para, &lensTree, ROOT, &sourceTree, ROOT, FIRSTCALL);
 

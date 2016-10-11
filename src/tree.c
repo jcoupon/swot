@@ -284,6 +284,78 @@ void freeMask(const Config para, Mask mask){
 
 }
 
+void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i, long NLeaf, int firstCall){
+   static fitsfile  *fileOut;
+   int l, dim;
+ 	int status = 0;       /* status must always be initialized = 0  */
+
+	int tfields;
+	char extname[] = "tree";
+	char **ttype, **tform, **tunit;
+
+	static long n=1;
+
+   /* Create the output file */
+   if(firstCall){
+
+		tfields = NDIM + 2;
+		ttype = malloc(tfields* sizeof(char*));
+		tform = malloc(tfields* sizeof(char*));
+		tunit = malloc(tfields* sizeof(char*));
+
+		for(dim=0;dim<NDIM;dim++){
+			ttype[dim] = malloc((72+1)*sizeof(char*));
+      	sprintf(ttype[dim], "dim%d", dim+1);
+			tform[dim] = "D";
+			tunit[dim] = "\0";
+
+		}
+
+   	ttype[NDIM] = "weight";
+		tform[NDIM] = malloc((72+1)*sizeof(char*));
+   	sprintf(tform[NDIM], "%dI", para.nsamples);
+		tunit[NDIM] = "\0";
+
+   	ttype[NDIM+1] = "rank";
+		tform[NDIM+1] = "I";
+		tunit[NDIM+1] = "\0";
+
+		fits_create_file(&fileOut, fileOutName, &status);
+   	/* if error occured, print out error message */
+   	if (status) fits_report_error(stderr, status);
+
+		fits_create_tbl(fileOut, BINARY_TBL, 0, tfields, ttype, tform, tunit, extname, &status);
+   	if (status) fits_report_error(stderr, status);
+	}
+
+   if(tree.N[i] > NLeaf){
+      printTreeFits(para, fileOutName, tree, tree.left[i], NLeaf, 0);
+      printTreeFits(para, fileOutName, tree, tree.right[i], NLeaf, 0);
+   }else{
+
+		for(dim=0;dim<NDIM;dim++) fits_write_col(fileOut, TDOUBLE, dim+1, n, 1, 1, &(tree.point.x[NDIM*i+dim]), &status);
+		if (status) fits_report_error(stderr, status);
+
+		fits_write_col(fileOut, TBYTE, NDIM+1, n, 1, para.nsamples, &(tree.w[para.nsamples*i]), &status);
+		if (status) fits_report_error(stderr, status);
+
+		fits_write_col(fileOut, TINT, NDIM+2, n, 1, 1, (void *)&(para.rank), &status);
+		if (status) fits_report_error(stderr, status);
+		n++;
+	}
+
+   if(firstCall){
+		fits_close_file(fileOut, &status);
+		for(dim=0;dim<NDIM;dim++){ free(ttype[dim]);};
+		free(ttype);
+		free(tform[NDIM]);
+		free(tform);
+		free(tunit);
+	}
+
+}
+
+
 void printTree(const Config para, char *fileOutName, const Tree tree, long i, long NLeaf, int firstCall){
    static FILE *fileOut;
    int l, dim;

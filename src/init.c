@@ -42,11 +42,25 @@ void initPara(int argc, char **argv, Config *para){
    [xi(r)]       X  Y   Z (Mpc)
    [number]      RA DEC X */
 
+
+	//para->data1Id = NULL;
+	//para->data2Id = NULL;
+	//para->ran1Id = NULL;
+	//para->ran2Id = NULL;
+
    for(i=0;i<NIDSMAX;i++){
-      para->data1Id[i] = i+1;
-      para->data2Id[i] = i+1;
-      para->ran1Id[i]  = i+1;
-      para->ran2Id[i]  = i+1;
+		para->data1Id[i] = malloc((72+1) * sizeof(char));
+		para->data2Id[i] = malloc((72+1) * sizeof(char));
+		para->ran1Id[i] = malloc((72+1) * sizeof(char));
+		para->ran2Id[i] = malloc((72+1) * sizeof(char));
+      sprintf(para->data1Id[i], "%d", i+1);
+      sprintf(para->data2Id[i], "%d", i+1);
+      sprintf(para->ran1Id[i], "%d", i+1);
+      sprintf(para->ran2Id[i], "%d", i+1);
+      //para->data1Id[i] = i+1;
+      //para->data2Id[i] = i+1;
+      //para->ran1Id[i]  = i+1;
+      //para->ran2Id[i]  = i+1;
    }
    NDIM              = 2; /* number of dimensions, 2 or 3 */
    para->distAng     = &distAngSpher;
@@ -71,9 +85,10 @@ void initPara(int argc, char **argv, Config *para){
    para->calib       = 0;
    para->resample2D  = 0;
    para->printTree   = 0;
+   para->printTreeAndExit = 0;
    para->seed         = -1;
    para->printSamples = 0;
-
+   para->fits         = -1;
 
    /* only master talks */
    if(para->rank == MASTER){
@@ -96,7 +111,7 @@ void initPara(int argc, char **argv, Config *para){
          if(para->verbose){
             fprintf(stderr,"\n\n\
                      S W O T\n\n\
-       (Super W Of Theta) MPI version 1.2\n\n\
+       (Super W Of Theta) MPI version 1.3\n\n\
 Program to compute two-point correlation functions.\n\
 Usage: %s -c configFile [options]: run the program\n\
        %s -d: display a default configuration file\n\
@@ -112,13 +127,14 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          printf("# Input catalogues                                           #\n");
          printf("# ---------------------------------------------------------- #\n");
          printf("data1          %s  # input data catalogue #1\n",    para->fileInName1);
-         printf("cols1          %d,%d\t  # Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
+         printf("cols1          %s,%s\t  # Column ids for data1\n",  para->data1Id[0],para->data1Id[1]);
          printf("data2          %s  # input data catalogue #2\n",    para->fileInName2);
-         printf("cols2          %d,%d\t  # Column ids for data2\n",  para->data2Id[0],para->data2Id[1]);
+         printf("cols2          %s,%s\t  # Column ids for data2\n",  para->data2Id[0],para->data2Id[1]);
          printf("ran1           %s\t  # input random catalogue #1\n",para->fileRanName1);
-         printf("rancols1       %d,%d\t  # Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
+         printf("rancols1       %s,%s\t  # Column ids for ran1\n",   para->ran1Id[0],para->ran1Id[1]);
          printf("ran2           %s\t  # input random catalogue #2\n",para->fileRanName2);
-         printf("rancols2       %d,%d\t  # Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
+         printf("rancols2       %s,%s\t  # Column ids for ran2\n",   para->ran2Id[0],para->ran2Id[1]);
+         printf("fits           auto\t  # input files in fits format? [auto,yes,no(ascii)].\n");
          //   printf("coord          RADEC\t  #Coordinates: [RADEC,CART,CART3D]\n");
          //printf("                    \t  #in degrees if RADEC\n");
          printf("# ---------------------------------------------------------- #\n");
@@ -154,10 +170,11 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          printf("proj           theta\t # Axis projection [theta, como, phys]\n");
          printf("                    \t # for auto, cross: default: theta (deg)\n");
          printf("                    \t # for auto_[3d,wp], cross_[3d,wp], gglens: default: como (Mpc)\n");
-         printf("out            %s\t # Output file\n", para->fileOutName);
+         printf("out            %s\t # Output file in ascii format\n", para->fileOutName);
          printf("cov            no\t # Covariance matrix of errors [yes,no] (in \"out\".cov)\n");
          printf("xi             no\t # xi(rp, pi) for auto_wp [yes,no] (in \"out\".xi)\n");
-         printf("printTree      no\t # Ouput tree in \"out\".tree\n");
+         printf("printTree      no\t # Output tree in \"out\".data[1,2]_tree.[ascii,fits]\n");
+         printf("printTreeAndExit no\t # Same as above but exits after\n");
          printf("printSamples   no\t # Ouput samples in \"out\".samples\n");
          exit(EXIT_FAILURE);
       }
@@ -171,7 +188,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          FILE *configFile = fopenAndCheck(argv[i+1],"r",para->verbose);
          noconfigFile     = 0;
          while(fgets(line,NFIELD*NCHAR,configFile) != NULL){
-            if(getStrings(line,item," ",&Ncol))
+            if(getStrings(line, item," ",&Ncol))
             setPara(getCharValue(item,1),getCharValue(item,2),para);
          }
          fclose(configFile);
@@ -184,14 +201,14 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
    }
 
    /* ----------------------------------------------------------------------
-   * STEP 3: third loop over arguments. Read the command line options
-   * (overwrite config file option). */
+    * STEP 3: third loop over arguments. Read the command line options
+    * (overwrite config file option). */
    for(i=0;i<argc;i++){
       if(*argv[i] == '-') setPara(argv[i]+1, argv[i+1], para);
    }
 
    /* ----------------------------------------------------------------------
-   * STEP 4: readjust parameters if needed */
+    * STEP 4: readjust parameters if needed */
 
    /* Random seed */
    if(para->rank == MASTER && para->seed > 0){
@@ -207,6 +224,14 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
    if( (para->corr == GGLENS || para->corr == AUTO_WP || para->corr == CROSS_WP) && para->proj == THETA ){
       para->proj = COMO;
    }
+
+	if (para->fits == -1){
+		if ( checkFileExt(para->fileInName1, ".fits") || checkFileExt(para->fileInName1, ".fit")){
+			para->fits = 1;
+		}else{
+			para->fits = 0;
+		}
+	}
 
    /* Adjust number of dimensions */
    if(para->proj == COMO || para->proj == PHYS || para->corr == AUTO_3D || para->corr == CROSS_3D) NDIM  = 3;
@@ -294,28 +319,32 @@ void setPara(char *field, char *arg, Config *para){
    }else if(!strcmp(field,"cols1")){
       checkArg(field,arg,para);
       getStrings(arg,list,",",&Ncol);
-      for(j=0;j<Ncol;j++)  para->data1Id[j] = getIntValue(list,j+1);
+		for(j=0;j<Ncol;j++) strcpy(para->data1Id[j], getCharValue(list,j+1));
+		// for(j=0;j<Ncol;j++)  para->data1Id[j] = getIntValue(list,j+1);
    }else if(!strcmp(field,"data2")){
       checkArg(field,arg,para);
       strcpy(para->fileInName2,arg);
    }else if(!strcmp(field,"cols2")){
       checkArg(field,arg,para);
       getStrings(arg,list,",",&Ncol);
-      for(j=0;j<Ncol;j++)  para->data2Id[j] = getIntValue(list,j+1);
+		for(j=0;j<Ncol;j++) strcpy(para->data2Id[j], getCharValue(list,j+1));
+      // for(j=0;j<Ncol;j++)  para->data2Id[j] = getIntValue(list,j+1);
    }else if(!strcmp(field,"ran1")){
       checkArg(field,arg,para);
       strcpy(para->fileRanName1,arg);
    }else if(!strcmp(field,"rancols1")){
       checkArg(field,arg,para);
       getStrings(arg,list,",",&Ncol);
-      for(j=0;j<Ncol;j++)  para->ran1Id[j] = getIntValue(list,j+1);
+		for(j=0;j<Ncol;j++) strcpy(para->ran1Id[j], getCharValue(list,j+1));
+      // for(j=0;j<Ncol;j++)  para->ran1Id[j] = getIntValue(list,j+1);
    }else if(!strcmp(field,"ran2")){
       checkArg(field,arg,para);
       strcpy(para->fileRanName2,arg);
    }else if(!strcmp(field,"rancols2")){
       checkArg(field,arg,para);
       getStrings(arg,list,",",&Ncol);
-      for(j=0;j<Ncol;j++)  para->ran2Id[j] = getIntValue(list,j+1);
+		for(j=0;j<Ncol;j++) strcpy(para->ran2Id[j], getCharValue(list,j+1));
+      // for(j=0;j<Ncol;j++)  para->ran2Id[j] = getIntValue(list,j+1);
       /*
    }else if(!strcmp(field,"coord")) {
    checkArg(field,arg,para);
@@ -324,6 +353,12 @@ void setPara(char *field, char *arg, Config *para){
    else if(!strcmp(arg,"CART3D"))  para->coordType = CART3D;
    else checkArg(field, NULL, para);
    */
+}else if(!strcmp(field,"fits")) {
+   checkArg(field,arg,para);
+   if(!strcmp(arg,"auto"))     para->fits = -1;
+   else if(!strcmp(arg,"yes")) para->fits = 1;
+   else if(!strcmp(arg,"no"))  para->fits = 0;
+   else checkArg(field, NULL, para);
 }else if(!strcmp(field,"corr")) {
    checkArg(field, arg, para);
    if(!strcmp(arg,"cross"))         para->corr = CROSS;
@@ -425,6 +460,10 @@ void setPara(char *field, char *arg, Config *para){
    checkArg(field,arg,para);
    if(!strcmp(arg,"yes")) para->printTree = 1;
    else para->printTree = 0;
+}else if(!strcmp(field,"printTreeAndExit")){
+   checkArg(field,arg,para);
+   if(!strcmp(arg,"yes")) para->printTreeAndExit = 1;
+   else para->printTreeAndExit = 0;
 }else if(!strcmp(field,"printSamples")){
    checkArg(field,arg,para);
    if(!strcmp(arg,"yes")) para->printSamples = 1;

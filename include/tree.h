@@ -20,6 +20,7 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
 void freeMask(const Config para, Mask mask);
 void freeTree(Config para, Tree tree);
 long splitTree(const Config *para, const Tree *tree1, const long root, const long Ncpu, int firstCall);
+void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i, long NLeaf, int firstCall);
 void printTree(const Config para, char *fileOutName, const Tree tree, long i, long NLeaf, int firstcall);
 long countNodes(long N, long NLeaf);
 
