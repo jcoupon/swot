@@ -6,7 +6,7 @@ Contributors: Alexie Leauthaud, Martin Kilbinger, Elinor Medezinski.
 
 ## Description
 
-[NEW]: fits support added for input files (faster reading, names for input columns, and [CFITSIO filters]).
+** [NEW]: fits support added for input files (faster reading, names for input columns, and [CFITSIO filters](http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html)). **
 
 `SWOT` is a software written in C to compute astrophysical two-point correlation functions and weighted histograms, along with fast sky-based resampling error and covariance matrix estimations.
 
@@ -50,7 +50,7 @@ To download and install CFITSIO, please visit http://heasarc.gsfc.nasa.gov/docs/
 3. Run `Make`
 
 If OPEN MPI or GSL are installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly, or run:
-```
+``` bash
 make GSL=path/to/gsl MPI=path/to/mpi
 ```
 
@@ -167,5 +167,3 @@ by automatically forking the project and prompting to send a pull request too.
 [fork]: http://help.github.com/forking/
 [branch]: https://help.github.com/articles/creating-and-deleting-branches-within-your-repository
 [pr]: http://help.github.com/pull-requests/
-
-[CFITSIO filters]: http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html
