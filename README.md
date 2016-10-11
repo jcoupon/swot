@@ -6,7 +6,7 @@ Contributors: Alexie Leauthaud, Martin Kilbinger, Elinor Medezinski.
 
 ## Description
 
-[NEW]: fits support added for input files (faster reading, names for input colums, and CFITSIO filters, see http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html).
+[NEW]: fits support added for input files (faster reading, names for input columns, and [CFITSIO filters]).
 
 `SWOT` is a software written in C to compute astrophysical two-point correlation functions and weighted histograms, along with fast sky-based resampling error and covariance matrix estimations.
 
@@ -167,3 +167,5 @@ by automatically forking the project and prompting to send a pull request too.
 [fork]: http://help.github.com/forking/
 [branch]: https://help.github.com/articles/creating-and-deleting-branches-within-your-repository
 [pr]: http://help.github.com/pull-requests/
+
+[CFITSIO filters]: http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html
