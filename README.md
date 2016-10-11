@@ -6,6 +6,8 @@ Contributors: Alexie Leauthaud, Martin Kilbinger, Elinor Medezinski.
 
 ## Description
 
+[NEW]: fits support added for input files (faster reading, names for input colums, and CFITSIO filters, see http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html).
+
 `SWOT` is a software written in C to compute astrophysical two-point correlation functions and weighted histograms, along with fast sky-based resampling error and covariance matrix estimations.
 
 Available estimators include:
@@ -29,14 +31,17 @@ If you use this software, please cite Coupon et al. (2012, A&A, 542A, 5): http:/
 
 ### Dependencies
 
-`SWOT` requires OPEN MPI (for paralellisation) and GSL (for integration and random numbers) libraires.
+`SWOT` requires OPEN MPI (for paralellisation), GSL (for integration and random numbers), and CFITSIO libraires.
 
 To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), install OPEN MPI with the following command:
 ```
 ./configure --prefix=YOUR/PATH CC=icc CXX=icpc
 ```
 
-To download and install GSL, please visit http://www.gnu.org/software/gsl/
+To download and install GSL, please visit http://www.gnu.org/software/gsl/.
+
+
+To download and install CFITSIO, please visit http://heasarc.gsfc.nasa.gov/docs/software/fitsio/fitsio.html.
 
 ### SWOT
 
@@ -119,6 +124,13 @@ The input format is set with the `cols[1,2]` and `rancols[1,2]` options (the fir
 * default input format for `gglens`. Lenses (`-cols1`) `RA DEC z sigz`. Change column ids with: `-cols1 1,2,3,4`. Sources (`-cols2`) `RA DEC z sigz e1 e2 weight`. Change column ids with: `-cols2 1,2,3,4,5,6,7`.
 
 * default input format for `gglens` to compute calibration factor (`-calib yes`). Lenses (`-cols1`) `RA DEC z sigz`. Change column ids with: `-cols1 1,2,3,4`. Sources (`-cols2`) `RA DEC z sigz calib e2 weight`. Change column ids with: `-cols2 1,2,3,4,5,6,7`, where calib = 1+m or c.
+
+### Input format (fits files)
+
+Same as above, except that column ids may be replaced by their actual names.
+
+`-fits`: [auto,yes,no]. If "auto", will interpret files with ".fits" or ".fit" as binary fits tables.
+
 
 ### bin configuration
 
