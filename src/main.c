@@ -29,9 +29,7 @@
  *    to decide this question. NOT URGENT
  *
  *    Known bugs:
- *    - when resampling, some objects fall outside the excluded zone
- *    - the mean <R> is R for auto_wp (why?)
- *    - errors for w(R) when using weights are zero
+ *
  *
  */
 

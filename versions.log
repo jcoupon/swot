@@ -4,6 +4,7 @@ v 1.3
 - added input file fits support
 - added output tree fits support
 - added printTreeAndExit option
+- bug with subsample limits corrected
 
 v 1.2
 - added the nbins_pi option
