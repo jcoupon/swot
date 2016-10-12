@@ -171,7 +171,7 @@ See also http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html.
 
 ### tree and weights
 
-`printTree`: outputs the tree structure in "out".data[1,2]\_tree.[ascii,fits]. Output format in ascii or fits, depending on input file format. The recorded columns are "dim1 dim2 ... dimNDIM weight1 weight2 ... weigntNsamples rank".
+`printTree`: outputs the tree structure in "out".data[1,2]\_tree.[ascii,fits]. Output format in ascii or fits, depending on input file format. The recorded columns are "dim1 dim2 ... dimNDIM sub_weights1 sub_weights2 ... sub_weightsNamples sub_id rank".
 
 `printTreeAndExit`: same as above but exists after.
 
