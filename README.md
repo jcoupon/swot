@@ -143,7 +143,9 @@ The `[RA>30.0&&#row%10==0]` filter will select one in 10 random objects and with
 More examples from the [CFITSIO documentation](http://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/cfitsio.html):
 > `[ binary && mag <= 5.0]`: Extract all binary stars brighter than fifth magnitude (note that the initial space is necessary to prevent it from being treated as a binning specification).
 
-> `[#row >= 125 && #row <= 175] [IMAGE[4,5] .gt. 100]`: Extract all rows that have the (4,5) component of the IMAGE column greater than 100.
+> `[#row >= 125 && #row <= 175]`: Extract row numbers 125 through 175.
+
+> `[IMAGE[4,5] .gt. 100]`: Extract all rows that have the (4,5) component of the IMAGE column greater than 100.
 
 > `[abs(sin(theta * #deg)) < 0.5]`: Extract all rows having the absolute value of the sine of theta less than a half where the angles are tabulated in degrees.
 
