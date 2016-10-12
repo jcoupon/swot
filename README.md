@@ -34,7 +34,7 @@ If you use this software, please cite [Coupon et al. (2012, A&A, 542A, 5)](http:
 `SWOT` requires OPEN MPI (for paralellisation), GSL (for integration and random numbers), and CFITSIO libraires.
 
 To install OPEN MPI, please visit http://www.open-mpi.org/. Note that OPEN MPI is a wrapper to the default C-code compiler on your machine. To install it with another C compiler (for example intel `icc`), install OPEN MPI with the following command:
-``` bash
+```shell
 $ ./configure --prefix=YOUR/PATH CC=icc CXX=icpc
 ```
 
@@ -50,7 +50,7 @@ To download and install CFITSIO, please visit http://heasarc.gsfc.nasa.gov/docs/
 3. Run `Make`
 
 If OPEN MPI or GSL are installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly, or run:
-``` bash
+```shell
 $ make GSL=path/to/gsl MPI=path/to/mpi
 ```
 
