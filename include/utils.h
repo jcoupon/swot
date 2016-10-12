@@ -100,22 +100,26 @@ double EPS;
 /* 	data point structure */
 typedef struct Point
 {
-  /* 	number of points */
-  long N;
+	/* 	number of points */
+	long N;
 
-  /* 	dimension along which they are sorted
-     	(ascending order). -1 if not.  */
-  int dim;
+	/* 	dimension along which they are sorted
+	  	(ascending order). -1 if not.  */
+	int dim;
 
-  /* 	coordinates: Point.x[NDIM*n+DIM].
-   * 	For gglensing and wp(rp), redshift is DIM = 3 */
-  double *x;
+	/* 	subsample id to which the point belongs */
+	int *sub_id;
 
-  /* only used for gg lensing, Point.*[n] */
-  double *zerr; /* redshift error         */
-  double *e1;   /* ellipticity            */
-  double *e2;
-  double *w;    /* ellipticity weight     */
+	/* 	coordinates: Point.x[NDIM*n+DIM].
+	 *		For gglensing and wp(rp), redshift is DIM = 3 */
+	double *x;
+
+	/* 	only used for gg lensing, Point.*[n] */
+	double *zerr; /* redshift error         */
+	double *e1;   /* ellipticity            */
+	double *e2;
+	double *w;    /* (ellipticity) weight     */
+
 } Point;
 
 
@@ -244,7 +248,8 @@ int checkFileExt(const char *s1, const char *s2);
  *   Point routines
  */
 
-void splitData(const Config para, const Point data, int dim, Point *dataLeft, Point *dataRight);
+double splitData(const Config para, const Point data, int dim, Point *dataLeft, Point *dataRight);
+void setLimits(const Point *data, Mask *limits);
 void quickSort(const Config para, Point data, int dim, long start, long end);
 Point createPoint(const Config para, long N);
 void freePoint(const Config para, Point point);

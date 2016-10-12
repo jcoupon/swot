@@ -16,7 +16,7 @@
  */
 
 Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCall);
-void resample(const Config *para, const Point *data, int dim, Mask *mask, int firstCall);
+void resample(const Config *para, const Point *data, int dim, Mask *mask, Mask const *limits, int firstCall);
 void freeMask(const Config para, Mask mask);
 void freeTree(Config para, Tree tree);
 long splitTree(const Config *para, const Tree *tree1, const long root, const long Ncpu, int firstCall);

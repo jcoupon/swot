@@ -178,13 +178,13 @@ int checkFileExt(const char *s1, const char *s2){
  */
 
 
-void splitData(const Config para, const Point data, int dim, Point *dataLeft, Point *dataRight){
-   /* Takes a full array of data and sorts it in place along
-   * the "dim" coordinate. Then returns the address of the two
-   * children in dataLeft and dataRight, and the number of
-   * points in NLeft and NRight. Since the partition is
-   * made "in place" it does not use any extra memory.
-   */
+double splitData(const Config para, const Point data, int dim, Point *dataLeft, Point *dataRight){
+   /* 	Takes a full array of data and sorts it in place along
+    * 	the "dim" coordinate. Then returns the address of the two
+    * 	children in dataLeft and dataRight, and the number of
+    * 	points in NLeft and NRight. Since the partition is
+    * 	made "in place" it does not use any extra memory.
+    */
 
    /* sort data along the "dim" coordinate */
    quickSort(para, data, dim, 0, data.N - 1);
@@ -199,9 +199,28 @@ void splitData(const Config para, const Point data, int dim, Point *dataLeft, Po
    copyPointAddress(para, dataLeft,  data, 0);           /* left child.  starts at data + 0      */
    copyPointAddress(para, dataRight, data, dataLeft->N); /* right child. starts at data + NLeft  */
 
-   return;
+   return data.x[NDIM*dataLeft->N+dim];
 }
 
+void setLimits(const Point *data, Mask *limits){
+
+	int dim;
+	long i;
+
+	/* compute limits of the data */
+   for(dim=0;dim<NDIM;dim++){
+      limits->min[dim] = data->x[NDIM*0+dim]; /* 	min */
+      limits->max[dim] = data->x[NDIM*0+dim]; /* 	max */
+   }
+   for(i=1;i<data->N;i++){
+      for(dim=0;dim<NDIM;dim++){
+         limits->min[dim] = MIN(limits->min[dim], data->x[NDIM*i+dim]);
+         limits->max[dim] = MAX(limits->max[dim], data->x[NDIM*i+dim]);
+      }
+   }
+
+	return;
+}
 
 void quickSort(const Config para, Point data, int dim, long start, long end){
    /* Sorts data in place (increasing order) along the dimension "dim".
@@ -424,6 +443,7 @@ Point createPoint(const Config para, long N){
    point.N   = N;
    point.dim = -1;
 
+	point.sub_id = (int *)malloc(N*sizeof(int));
    point.x = (double *)malloc(N*NDIM*sizeof(double));
    point.w = (double *)malloc(N*sizeof(double));
    if(para.corr == GGLENS){
@@ -437,13 +457,14 @@ Point createPoint(const Config para, long N){
 
 void freePoint(const Config para, Point point){
 
-   free(point.x);
-   free(point.w);
    if(para.corr == GGLENS){
       free(point.zerr);
       free(point.e1);
       free(point.e2);
    }
+   free(point.sub_id);
+	free(point.x);
+   free(point.w);
 
    return;
 }

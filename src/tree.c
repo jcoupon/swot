@@ -56,10 +56,13 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
    /* total weigthed number of objects (N X mean weight)*/
    result.N[local_index] = (double)data->N*result.point.w[local_index];
 
+	result.point.sub_id[local_index] = -1;
+
    /* set weights from mask */
    int ndim;
    if(para->resample2D) ndim = 2;
    else ndim = NDIM;
+
    for(j=0;j<para->nsub;j++){  /* loop over subsamples */
       n = 0;
       for(i=0;i<ndim;i++){
@@ -67,10 +70,11 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
             result.point.x[NDIM*local_index + i] < mask->max[ndim*j + i] );
          }
          if(n == ndim){  /* "result.point" is in the subsample "j" */
-         for(i=0;i<para->nsamples;i++){  /* loop over resamplings  */
-            result.w[para->nsamples*local_index + i] = mask->w[para->nsub*i+j];
-         }
-         break;
+	         for(i=0;i<para->nsamples;i++){  /* loop over resamplings  */
+	            result.w[para->nsamples*local_index + i] = mask->w[para->nsub*i+j];
+	         }
+				result.point.sub_id[local_index] = j;
+	         break;
       }
    }
 
@@ -152,16 +156,19 @@ Tree buildTree(const Config *para, Point *data, Mask *mask, int dim, int firstCa
    return result;
 }
 
-void resample(const Config *para, const Point *data, int dim, Mask *mask, int firstCall){
-   /* splits data into a number of sub samples, resample it and builds up a
-   * mask with weights. Then send the mask (if MASTER)
-   * or receive it (if SLAVE). The mask is used in buildTree()
-   * to attribute a weight to each node. */
+void resample(const Config *para, const Point *data, int dim, Mask *mask, const Mask *limits, int firstCall){
+   /* 	splits data into a number of sub samples, resample it and builds up a
+    * 	mask with weights. Then send the mask (if MASTER)
+    * 	or receive it (if SLAVE). The mask is used in buildTree()
+    * 	to attribute a weight to each node.
+	 */
 
    static long depth, depthSample, count;
    long i, j, l, rank;
+	double splitValue;
 
-   int ndim;
+
+   int d, ndim;
    if(para->resample2D) ndim = 2;
    else ndim = NDIM;
 
@@ -174,102 +181,135 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, int fi
       /* check up sample values value and evaluate depthSample */
       if(para->nsamples == 0){
          return;
-         /*
+      /*
       }else if(para->nsamples > 256 || para->nsub > 256){
-      if(para->verbose)
-      fprintf(stderr,"\n%s: **ERROR** nsamplesand nsub must be <= 256. Exiting...\n", MYNAME);
-      MPI_Finalize();
-      exit(EXIT_FAILURE);
+      	if(para->verbose)
+      	fprintf(stderr,"\n%s: **ERROR** nsamplesand nsub must be <= 256. Exiting...\n", MYNAME);
+      	MPI_Finalize();
+      	exit(EXIT_FAILURE);
       */
-   }else if(lowestPowerOfTwo(para->nsub, &depthSample) != para->nsub){
-      if(para->verbose)
-      fprintf(stderr,"\n%s: **ERROR** nsub must be a power of 2. Exiting...\n", MYNAME);
-      MPI_Finalize();
-      exit(EXIT_FAILURE);
-   }
+	   }else if(lowestPowerOfTwo(para->nsub, &depthSample) != para->nsub){
+	      if(para->verbose)
+	      fprintf(stderr,"\n%s: **ERROR** nsub must be a power of 2. Exiting...\n", MYNAME);
+	      MPI_Finalize();
+	      exit(EXIT_FAILURE);
+	   }
 
-   /* initialisation */
-   mask->min = (double *)malloc(ndim*para->nsub*sizeof(double));
-   mask->max = (double *)malloc(ndim*para->nsub*sizeof(double));
-   mask->w   = (unsigned char *)malloc(para->nsamples*para->nsub*sizeof(unsigned char));
+	   /* initialisation */
+	   mask->min = (double *)malloc(ndim*para->nsub*sizeof(double));
+	   mask->max = (double *)malloc(ndim*para->nsub*sizeof(double));
+	   mask->w   = (unsigned char *)malloc(para->nsamples*para->nsub*sizeof(unsigned char));
 
-   if(para->rank == MASTER){
+	   if(para->rank == MASTER){
 
-      if(para->nsub > data->N){
-         if(para->verbose)
-         fprintf(stderr,"\n%s: **ERROR** nsub must be < Npoints. Exiting...\n", MYNAME);
-         exit(EXIT_FAILURE);
-      }
+	      if(para->nsub > data->N){
+	         if(para->verbose)
+	         fprintf(stderr,"\n%s: **ERROR** nsub must be < Npoints. Exiting...\n", MYNAME);
+	         exit(EXIT_FAILURE);
+	      }
 
-      for(i=0;i<para->nsamples*para->nsub;i++) mask->w[i] = 0;
+	      for(i=0;i<para->nsamples*para->nsub;i++) mask->w[i] = 0;
 
-      for(i=0;i<para->nsamples;i++){
-         for(j=0;j<para->nsub;j++){
-            /* i: resample draw index
-            * j: subsample index
-            */
-            switch(para->err){
-               case SUBSAMPLE: mask->w[para->nsub*i + j] = (i == j);             break;
-               case JACKKNIFE: mask->w[para->nsub*i + j] = !(i == j);            break;
-               case BOOTSTRAP: mask->w[para->nsub*i + randInt(para->nsub)] += 1; break;
-            }
-         }
-      }
+	      for(i=0;i<para->nsamples;i++){
+	         for(j=0;j<para->nsub;j++){
+	            /* 	i: resample draw index
+	             * 	j: subsample index
+	             */
+	            switch(para->err){
+	               case SUBSAMPLE: mask->w[para->nsub*i + j] = (i == j);             break;
+	               case JACKKNIFE: mask->w[para->nsub*i + j] = !(i == j);            break;
+	               case BOOTSTRAP: mask->w[para->nsub*i + randInt(para->nsub)] += 1; break;
+	            }
+	         }
+	      }
 
-      /* make sure no mask value is larger than 256 */
-      for(i=0;i<para->nsamples*para->nsub;i++){
-         if(mask->w[i]  > 255){
-            if(para->verbose)
-            fprintf(stderr,"\n%s: **ERROR** a mask value > 255 was produced, stack overflow will occur. Exiting...\n", MYNAME);
-            exit(EXIT_FAILURE);
-         }
-      }
+	      /* make sure no mask value is larger than 256 */
+	      for(i=0;i<para->nsamples*para->nsub;i++){
+	         if(mask->w[i]  > 255){
+	            if(para->verbose)
+	            fprintf(stderr,"\n%s: **ERROR** a mask value > 255 was produced, stack overflow will occur. Exiting...\n", MYNAME);
+	            exit(EXIT_FAILURE);
+	         }
+	      }
+	   }
+	}
 
-   }
-}
+	if(para->rank == MASTER){
+	   /* one level down */
+	   depth++;
 
-if(para->rank == MASTER){
-   /* one level down */
-   depth++;
+	   if(depth <= depthSample){
 
-   if(depth <= depthSample){
+	      Point dataLeft, dataRight;
 
-      Point dataLeft, dataRight;
+	      /* split the node into two along the "dim" coordinate */
+	      splitValue = splitData(*para, *data, dim, &dataLeft, &dataRight);
 
-      /* split the node into two along the "dim" coordinate */
-      splitData(*para, *data, dim, &dataLeft, &dataRight);
+			Mask limitsLeft, limitsRight;
 
-      /* next splitting coordinate */
-      dim++; if(dim > ndim-1) dim = 0;
+			limitsLeft.min = (double *)malloc(NDIM*sizeof(double));
+			limitsLeft.max = (double *)malloc(NDIM*sizeof(double));
+			limitsRight.min = (double *)malloc(NDIM*sizeof(double));
+			limitsRight.max = (double *)malloc(NDIM*sizeof(double));
 
-      resample(para, &dataLeft,  dim, mask, 0);
-      resample(para, &dataRight, dim, mask, 0);
+			for(d=0;d<ndim;d++){
+	         limitsLeft.min[d] = limits->min[d];
+	         limitsLeft.max[d] = limits->max[d];
+	         limitsRight.min[d] = limits->min[d];
+	         limitsRight.max[d] = limits->max[d];
+	      }
 
-   }else{
+			limitsLeft.max[dim] = splitValue;
+			limitsRight.min[dim] = splitValue;
 
-      /* compute limits of the mask */
-      for(dim=0;dim<ndim;dim++){
-         mask->min[ndim*count + dim] = data->x[NDIM*0+dim];
-         mask->max[ndim*count + dim] = data->x[NDIM*0+dim];
-      }
-      for(i=1;i<data->N;i++){
-         for(dim=0;dim<ndim;dim++){
-            mask->min[ndim*count + dim] = MIN(mask->min[ndim*count + dim], data->x[NDIM*i+dim]);
-            mask->max[ndim*count + dim] = MAX(mask->max[ndim*count + dim], data->x[NDIM*i+dim]);
-         }
-      }
-      count++;
-   }
+	      /* next splitting coordinate */
+	      dim++; if(dim > ndim-1) dim = 0;
 
-   /* one level up */
-   depth--;
-}
+			resample(para, &dataLeft,  dim, mask, &limitsLeft, 0);
+	      resample(para, &dataRight, dim, mask, &limitsRight, 0);
 
-if(firstCall){
-   MPI_Bcast(mask->min, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
-   MPI_Bcast(mask->max, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
-   MPI_Bcast(mask->w,   para->nsamples*para->nsub, MPI_UNSIGNED_CHAR, MASTER, MPI_COMM_WORLD);
-}
+			free(limitsLeft.min);
+			free(limitsLeft.max);
+			free(limitsRight.min);
+			free(limitsRight.max);
+
+	   }else{
+
+			for(dim=0;dim<ndim;dim++){
+	         mask->min[ndim*count + dim] = limits->min[dim];
+	         mask->max[ndim*count + dim] = limits->max[dim];
+	      }
+
+	   	//printf("%f %f\n", limits->min[0], limits->min[1]);
+	   	//printf("%f %f\n", limits->max[0], limits->max[1]);
+
+	      /* compute limits of the mask */
+			/*
+			for(dim=0;dim<ndim;dim++){
+	         mask->min[ndim*count + dim] = data->x[NDIM*0+dim];
+	         mask->max[ndim*count + dim] = data->x[NDIM*0+dim];
+	      }
+	      for(i=1;i<data->N;i++){
+	         for(dim=0;dim<ndim;dim++){
+	            mask->min[ndim*count + dim] = MIN(mask->min[ndim*count + dim], data->x[NDIM*i+dim]);
+	            mask->max[ndim*count + dim] = MAX(mask->max[ndim*count + dim], data->x[NDIM*i+dim]);
+	         }
+	      }
+			*/
+
+	      count++;
+	   }
+
+	   /* one level up */
+	   depth--;
+	}
+
+	if(firstCall){
+	   MPI_Bcast(mask->min, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+	   MPI_Bcast(mask->max, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+	   MPI_Bcast(mask->w,   para->nsamples*para->nsub, MPI_UNSIGNED_CHAR, MASTER, MPI_COMM_WORLD);
+
+	}
 
 return;
 }
@@ -298,7 +338,7 @@ void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i
    /* Create the output file */
    if(firstCall){
 
-		tfields = NDIM + 2;
+		tfields = NDIM + 3;
 		ttype = malloc(tfields* sizeof(char*));
 		tform = malloc(tfields* sizeof(char*));
 		tunit = malloc(tfields* sizeof(char*));
@@ -311,14 +351,19 @@ void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i
 
 		}
 
-   	ttype[NDIM] = "sample_weight";
+   	ttype[NDIM] = "sub_weights";
 		tform[NDIM] = malloc((72+1)*sizeof(char*));
    	sprintf(tform[NDIM], "%dI", para.nsamples);
 		tunit[NDIM] = "\0";
 
-   	ttype[NDIM+1] = "rank";
+   	ttype[NDIM+1] = "sub_id";
 		tform[NDIM+1] = "I";
 		tunit[NDIM+1] = "\0";
+
+   	ttype[NDIM+2] = "rank";
+		tform[NDIM+2] = "I";
+		tunit[NDIM+2] = "\0";
+
 
 		fits_create_file(&fileOut, fileOutName, &status);
    	/* if error occured, print out error message */
@@ -339,8 +384,12 @@ void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i
 		fits_write_col(fileOut, TBYTE, NDIM+1, n, 1, para.nsamples, &(tree.w[para.nsamples*i]), &status);
 		if (status) fits_report_error(stderr, status);
 
-		fits_write_col(fileOut, TINT, NDIM+2, n, 1, 1, (void *)&(para.rank), &status);
+		fits_write_col(fileOut, TINT, NDIM+2, n, 1, 1, (void *)&(tree.point.sub_id[i]), &status);
 		if (status) fits_report_error(stderr, status);
+
+		fits_write_col(fileOut, TINT, NDIM+3, n, 1, 1, (void *)&(para.rank), &status);
+		if (status) fits_report_error(stderr, status);
+
 		n++;
 	}
 
@@ -369,7 +418,8 @@ void printTree(const Config para, char *fileOutName, const Tree tree, long i, lo
    }else{
       for(dim=0;dim<NDIM;dim++)   fprintf(fileOut,"%f ", tree.point.x[NDIM*i+dim]);
       for(l=0;l<para.nsamples;l++)  fprintf(fileOut,"%d ", tree.w[para.nsamples*i + l] );
-      fprintf(fileOut,"     %d \n", para.rank);
+		fprintf(fileOut,"     %d ", tree.point.sub_id[i]);
+      fprintf(fileOut,"%d \n", para.rank);
    }
 
    if(firstCall) fclose(fileOut);
