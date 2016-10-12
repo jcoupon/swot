@@ -135,8 +135,12 @@ Same as above, except that column ids may be replaced by their actual names.
 Example:
 
 ```shell
-$ mpirun -np 8 swot -c configFile -corr auto -data1 'fileIn.fits[RA>30.0]' -cols1 RA,DEC -ran1 'fileRanIn.fits[RA>30.0]' -rancols1 RA,DEC
+$ mpirun -np 8 swot -c configFile -corr auto -data1 'fileIn.fits[RA>30.0]' -cols1 RA,DEC \
+	-ran1 'fileRanIn.fits[RA>30.0&&#row%10==0]' -rancols1 RA,DEC
 ```
+The `[RA>30.0&&#row%10==0]` filter will select one in 10 random objects and with RA coordinate larger than 30.0.
+
+> `[ binary && mag <= 5.0]`: Extract all binary stars brighter than fifth magnitude (note that the initial space is necessary to prevent it from being treated as a binning specification).
 
 ### bin configuration
 
