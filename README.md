@@ -62,14 +62,13 @@ The binary file is installed in swot-X.Y.Z/bin. Simply update your `PATH` variab
 
 ## Usage
 
-
 Run the software:
-```
+```shell
 $ mpirun -np [Ncpu] swot -c configFile -corr ESTIMATOR [options]:
 ```
 
 Display the default configuration file:
-```
+```shell
 $ swot -d: display a default configuration file
 ```
 
@@ -131,6 +130,13 @@ Same as above, except that column ids may be replaced by their actual names.
 
 `-fits`: [auto,yes,no]. If "auto", will interpret files with ".fits" or ".fit" as binary fits tables.
 
+### Fits intput filter (to be added to the inpute file name)
+
+Example:
+
+```shell
+$ mpirun -np 8 swot -c configFile -corr auto -data1 'fileIn.fits[RA>30.0]' -cols1 RA,DEC -ran1 'fileRanIn.fits[RA>30.0]' -rancols1 RA,DEC
+```
 
 ### bin configuration
 
@@ -143,7 +149,6 @@ Same as above, except that column ids may be replaced by their actual names.
 `printTree`: outputs the tree structure in "out".data[1,2]\_tree.[ascii,fits]. Output format in ascii or fits, depending on input file format. The recorded columns are "dim1 dim2 ... dimNDIM weight1 weight2 ... weigntNsamples rank".
 
 `printTreeAndExit`: same as above but exists after.
-
 
 
 ## Memory usage

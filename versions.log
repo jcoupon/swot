@@ -1,72 +1,72 @@
 Version history
 
-v 1.3 [Jean]
+v 1.3
 - added input file fits support
 - added output tree fits support
 - added printTreeAndExit option
 
-v 1.2 [Jean]
+v 1.2
 - added the nbins_pi option
 - did some code cleaning
 - split main.c into strucuted file system
 
-v 1.1.2 [Jean]
+v 1.1.2
 - replaced D1R1 and D2R2 in LS, Hamilton and Peebles
 estimator upon Elinor Medezinski's suggestion
 
-v 1.1.0 [Jean]
+v 1.1.0
 - bug fixed when data2 is lower than number of cpu
 - weight for randoms implemented in NUMBER, AUTO and CROSS tpcf
 
-v 1.0.2 [Jean]
+v 1.0.2
 - proj automatically set to theta if 3D correlation
 
-v 1.0.1 [Jean]
+v 1.0.1
 - small bug corrected in config file
 
-v 1.0.0 [Jean]
+v 1.0.0
 - added printTree in autoCorr (TO DO add it also for gg lens )
 - added nsub for bootstrap for cross and auto estimators
 - added -printSamples yes
 
-v 0.48 [Jean]
+v 0.48
 - bug corrected for -RR_in and RR_out
 
-v 0.47 [Jean]
+v 0.47
 - added options -RR_in and RR_out
 
-v 0.46 [Jean]
+v 0.46
 - in "correlation" and "number" functions,
   removed the additionnal Poisson contribution
   that was wrongly added once more to the
   sample variance new output format is
   [...] err(resampling)  err(resampling-poisson) err(poisson) [...]
 
-v 0.45 [Jean]
+v 0.45
 - added an option to compute subsample variance
   (-err subsample) for -corr number estimator
 
-v 0.44 [Jean]
+v 0.44
 - bug corrected in version 0.42 ALSO corrected
   for cross_3D (unlike previously stated)
 
-v 0.43 [Jean]
+v 0.43
 - sampling for gg lensing is done wrt to the
 source 2D distribution
 
-v 0.42 [Jean]
+v 0.42
 - fixed a bug for auto_3D and cross_3D
 
-v 0.41 [Jean]
+v 0.41
 - fixed a bug concerning pi_max
 
-v 0.40 [Jean]
+v 0.40
 - now integrates along pi in linear scale
 
-v 0.39 [Jean]
+v 0.39
 - corrected a bug for wp(r)
 
-v 0.38 [Jean]
+v 0.38
 - added options (-corr) auto_3D and cross_3D
 for 3D correlation functions
 
@@ -86,23 +86,23 @@ v 0.35
 - "-" error put back, but need to find a solution [see v 0.36]
 v 0.34
 - no "-" error
-v 0.33 March 5th 2013 [Jean]
+v 0.33 March 5th 2013
 - added the options (-err) jackknife2D and bootstrap2D
 
-v 0.32 Feb 15th 2013 [Jean]
+v 0.32 Feb 15th 2013
 - bug corrected in the list of options
 
-v 0.31  Feb 7th 2013 [Jean]
+v 0.31  Feb 7th 2013
 - calibration factors, -calib [yes/no] option added
 - "-corr number" option added to compute 1-pt quantities
   with bootstrap or jackknife errors
 - "-rot45" option added (to compute 45 deg. lensing signal)
   for systematics tests
 
-v 0.22 Nov 13, 2012 [Jean]
+v 0.22 Nov 13, 2012
 - Peebles estimator implemented (DD/DR, D1D2/D1R2)
 
-v 0.2 - 0.21 Oct 21st, 2012 [Jean]
+v 0.2 - 0.21 Oct 21st, 2012
 - w(R) implemented: -proj phys/como
 - wp(rp) can be computed as function
   of physical coordinates -proj phys
@@ -116,7 +116,7 @@ v 0.15 Aug 21st, 2012 [Alexie/Jean]
 - bug corrected for sig crit in phys coordinates
   (1+z_lens) factor was missing
 
-v 0.14 Aug 10th, 2012 [Jean]
+v 0.14 Aug 10th, 2012
 - implemented wp(rp): set -corr auto_wp
   and cross_wp for computing wp(rp)
 - added -xi yes option to print out xi(rp,pi)
@@ -129,16 +129,16 @@ v 0.14 Aug 10th, 2012 [Jean]
   if using icc, it must be compiled with -use-asm
   see http://stackoverflow.com/questions/11877044
 
-v 0.12 May 1st, 2012 [Jean]
+v 0.12 May 1st, 2012
 - xi(r) 3D added (option -coord CART3D)
 - default parameter file (swot -d) improved
 
-v 0.11 April 4th, 2012 [Jean]
+v 0.11 April 4th, 2012
 - data2 for sources catalogue
 - more details in swot -d, -o now works
 - no approx.: -OA no
 
-v 0.1 April 3rd, 2012 [Jean]
+v 0.1 April 3rd, 2012
 - version from the old - memory monster - one.
   For previous versions, see main.c in legacy/
   option "nboots" has been replaced by "nsamples"

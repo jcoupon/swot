@@ -694,10 +694,10 @@ void crossCorr(Config para){
       /* swap "1" and "2" if "1" is larger (to improve memory management)  */
       /*
       if(random1.N > random2.N){
-      comment(para, "ATTENTION: fileRan1 is larger than fileRan2. Swapping \"1\" and \"2\" to save memory...\n");
-      tmp = data1;   data1   = data2;   data2   = tmp;
-      tmp = random1; random1 = random2; random2 = tmp;
-      swapped = 1;
+         comment(para, "ATTENTION: fileRan1 is larger than fileRan2. Swapping \"1\" and \"2\" to save memory...\n");
+         tmp = data1;   data1   = data2;   data2   = tmp;
+         tmp = random1; random1 = random2; random2 = tmp;
+         swapped = 1;
       }
       */
    }
