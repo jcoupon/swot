@@ -140,15 +140,23 @@ $ mpirun -np 8 swot -c configFile -corr auto -data1 'fileIn.fits[RA>30.0]' -cols
 ```
 The `[RA>30.0&&#row%10==0]` filter will select one in 10 random objects and with RA coordinate larger than 30.0. Note that with Mac OS, spaces seem not to be allowed.
 
-More example from the [CFITSIO documentation](http://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/cfitsio.html):
+More examples from the [CFITSIO documentation](http://heasarc.gsfc.nasa.gov/docs/software/fitsio/c/c_user/cfitsio.html):
 > `[ binary && mag <= 5.0]`: Extract all binary stars brighter than fifth magnitude (note that the initial space is necessary to prevent it from being treated as a binning specification).
+
 > `[#row >= 125 && #row <= 175] [IMAGE[4,5] .gt. 100]`: Extract all rows that have the (4,5) component of the IMAGE column greater than 100.
+
 > `[abs(sin(theta * #deg)) < 0.5]`: Extract all rows having the absolute value of the sine of theta less than a half where the angles are tabulated in degrees.
+
 > `[SUM( SPEC > 3*BACKGRND )>=1]`: Extract all rows containing a spectrum, held in vector column SPEC, with at least one value 3 times greater than the background level held in a keyword, BACKGRND
+
 > `[VCOL=={1,4,2}]`: Extract all rows whose vector column VCOL contains the 3-elements 1, 4, and 2.
+
 > `[@rowFilter.txt]`: Extract rows using the expression contained within the text file rowFilter.txt.
+
 > `[gtifilter()]`: Search the current file for a GTI extension, filter the TIME column in the current table, using START/STOP times taken from columns in the GTI extension.
+
 > `[regfilter("pow.reg")]`: Extract rows which have a coordinate (as given in the X and Y columns) within the spatial region specified in the pow.reg region file.
+
 > `[regfilter("pow.reg", Xs, Ys)]`: Same as above, except that the Xs and Ys columns will be used to determine the coordinate of each row in the table.
 
 
