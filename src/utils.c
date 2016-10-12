@@ -220,8 +220,8 @@ void setLimits(const Point *data, Mask *limits){
    }
 
    for(dim=0;dim<NDIM;dim++){
-      limits->min[dim] -= EPS;
-      limits->max[dim] += EPS;
+      limits->min[dim] -= 2.0*EPS;
+      limits->max[dim] += 2.0*EPS;
    }
 
 
