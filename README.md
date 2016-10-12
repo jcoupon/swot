@@ -48,6 +48,7 @@ To download and install CFITSIO, please visit http://heasarc.gsfc.nasa.gov/docs/
 1. Download the latest version here https://github.com/jcoupon/swot/releases/latest
 2. Untar the archive and change directory to `swot-X.Y.Z`
 3. Run `Make`
+4. A test suite is available [here](https://drive.google.com/file/d/0By_5Nt3bfOudaFlSUFdaYWFaUjA/view?usp=sharing).
 
 If OPEN MPI or GSL are installed in a different directory than `/usr/local`, edit the `Makefile` and set the `MPI` or `GSL` variable accordingly, or run:
 ```shell
@@ -75,7 +76,6 @@ $ swot -d: display a default configuration file
 *Important*: if using "RADEC" coordinates, the angle in the input catalogues must be in decimal degrees.
 
 ## Options
-
 
 ###  Estimator (`-corr` and `-est`)
 
@@ -133,7 +133,6 @@ Same as above, except that column ids may be replaced by their actual names.
 ### Fits intput file filters
 
 Example:
-
 ```shell
 $ mpirun -np 8 swot -c configFile -corr auto -data1 'fileIn.fits[RA>30.0]' -cols1 RA,DEC \
 	-ran1 'fileRanIn.fits[RA>30.0&&#row%10==0]' -rancols1 RA,DEC

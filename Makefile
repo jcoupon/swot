@@ -64,6 +64,10 @@ $(EXEC):  $(OBJS)
 clean:
 	-${RM} ${OBJS}
 
+tar_test:
+	tar czvf test_swot.tgz test
+	cp test_swot.tgz $(HOME)/gdrive/public
+
 #tar:
 #	tar cvf $(EXEC).tar Makefile main.c main.h README $(EXEC)
 

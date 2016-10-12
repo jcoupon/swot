@@ -93,6 +93,7 @@ double EPS;
  *		new structures and global variables
  */
 
+#define FILENAMESIZE 1000
 
 #define NIDSMAX   7 /* maximum number of columns */
 
@@ -205,9 +206,9 @@ typedef struct Config
 	int rank, size, verbose;
 
 	/* 		input and output files information */
-	char fileInName1[1000],  fileInName2[1000];
-	char fileRanName1[1000], fileRanName2[1000];
-	char fileOutName[1000],  RRInFileName[1000], RROutFileName[1000];
+	char fileInName1[FILENAMESIZE],  fileInName2[FILENAMESIZE];
+	char fileRanName1[FILENAMESIZE], fileRanName2[FILENAMESIZE];
+	char fileOutName[FILENAMESIZE],  RRInFileName[FILENAMESIZE], RROutFileName[FILENAMESIZE];
 
 	/* 		column ids for input files */
 	// int data1Id[NIDSMAX], data2Id[NIDSMAX];
@@ -252,6 +253,7 @@ void copyPointAddress(const Config para, Point *a, Point b, long shift);
 void getMeanPoint(const Config para, Point a, long i, Point point);
 void swapPoint(const Config para, Point point,long i, long j);
 Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weighted);
+void readColFits(fitsfile *fileIn, int id_num, long N, double *x, int NDIM, int dim);
 
 double distAngPointCart(const Config *para, const Point *a, const long *i, const Point *b, const long *j);
 double distAngPointSpher(const Config *para, const Point *a, const long *i, const Point *b, const long *j);

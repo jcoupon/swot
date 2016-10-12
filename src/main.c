@@ -134,8 +134,14 @@ void numberCount(Config para){
 
    /*    Output tree to ascii file. format: RA DEC [w_0...w_nsamples] rank*/
    if(para.rank == 0 && (para.printTree || para.printTreeAndExit)){
-      sprintf(fileOutName, "%s.data.tree", para.fileOutName);
-      printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+      comment(para, "writing trees...");
+      if(para.fits){
+         sprintf(fileOutName, "!%s.data1_tree.fits", para.fileOutName);
+         printTreeFits(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+      }else{
+         sprintf(fileOutName, "%s.data1_tree.ascii", para.fileOutName);
+         printTree(para, fileOutName, dataTree, ROOT, 1, FIRSTCALL);
+      }
    }
    comment(para, "done.\n");
    if(para.printTreeAndExit){
@@ -282,7 +288,6 @@ void autoCorr(Config para){
 
       comment(para,"Reading fileIn1....");  data  = readCat(para, para.fileInName1, para.data1Id, para.weighted);
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd objects found).\n",data.N);}
-
    }
 
    /*    resample, build masks */
@@ -724,12 +729,21 @@ void crossCorr(Config para){
 
    /*    Ouput tree to ascii file. format: RA DEC [w_0...w_nsamples] rank */
    if(para.rank == 0 && (para.printTree || para.printTreeAndExit)){
-
-      sprintf(fileOutName, "%s.data1.tree", para.fileOutName);
-      printTree(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
-
-      sprintf(fileOutName, "%s.data2.tree", para.fileOutName);
-      printTree(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
+      comment(para, "writing trees...");
+      if(para.fits){
+         sprintf(fileOutName, "!%s.data1_tree.fits", para.fileOutName);
+         printTreeFits(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
+      }else{
+         sprintf(fileOutName, "%s.data1_tree.ascii", para.fileOutName);
+         printTree(para, fileOutName, dataTree1, ROOT, 1, FIRSTCALL);
+      }
+      if(para.fits){
+         sprintf(fileOutName, "!%s.data2_tree.fits", para.fileOutName);
+         printTreeFits(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
+      }else{
+         sprintf(fileOutName, "%s.data2_tree.ascii", para.fileOutName);
+         printTree(para, fileOutName, dataTree2, ROOT, 1, FIRSTCALL);
+      }
    }
    comment(para, "done.\n");
    if(para.printTreeAndExit){

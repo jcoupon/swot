@@ -311,7 +311,7 @@ void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i
 
 		}
 
-   	ttype[NDIM] = "weight";
+   	ttype[NDIM] = "sample_weight";
 		tform[NDIM] = malloc((72+1)*sizeof(char*));
    	sprintf(tform[NDIM], "%dI", para.nsamples);
 		tunit[NDIM] = "\0";

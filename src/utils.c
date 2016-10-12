@@ -153,16 +153,24 @@ void comment(const Config para, char *commentString){
 int checkFileExt(const char *s1, const char *s2){
   /*Checks if s2 matches s1 extension*/
 
-  int ext = strlen(s1) - strlen(s2);
+	char *filterPtr = NULL;
+	char s1Tmp[FILENAMESIZE];
 
-  if(strcmp(s1+ext, s2) == 0){
-    return 1;
-  }else{
-    return 0;
-  }
+	strcpy(s1Tmp, s1);
+
+	/* 	look for filter string and remove it */
+	filterPtr = strstr(s1Tmp, "[");
+	if (filterPtr != NULL){
+		*filterPtr = '\0';
+	}
+
+	int ext = strlen(s1Tmp) - strlen(s2);
+	if(strcmp(s1Tmp+ext, s2) == 0){
+		return 1;
+	}else{
+		return 0;
+	}
 }
-
-
 
 
 /*
@@ -448,7 +456,7 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
     * 	See http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html for fits syntax
 	 */
 
-   long j, n, N, dim, Ncol, repeat, width;
+   long j, n, N, dim, Ncol;
 	int anynul;
    char line[NFIELD*NCHAR], item[NFIELD*NCHAR];
 	Point data;
@@ -456,91 +464,61 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 	if (para.fits){
 
 		fitsfile *fileIn;
+		int status = 0, datatype, id_num[NIDSMAX];
 
-		int status = 0, datatype, id_num[NIDSMAX]; /* MUST initialize status */
 		fits_open_table(&fileIn, fileInName, READONLY, &status);
-		if (status) /* print any error messages */ fits_report_error(stderr, status);
+		if (status) fits_report_error(stderr, status);
 
-		/* convert column names into column numbers if required */
+		/* 	convert column names into column numbers if required */
       for(j=0;j<NIDSMAX;j++) {
 			id_num[j] = atoi(id[j]);
-			if(id_num[j] == 0){ /* if input column name is a string */
+			if(id_num[j] == 0){ /* 	if input column name is a string it will return "0" */
 				fits_get_colnum(fileIn, CASEINSEN, id[j], &(id_num[j]), &status);
-				if (status) /* print any error messages */ fits_report_error(stderr, status);
+				if (status) fits_report_error(stderr, status);
 			}
 		}
 
+	   /* 	get size of file and allocate data */
 		fits_get_num_rows(fileIn, &N, &status);
-		if (status) /* print any error messages */ fits_report_error(stderr, status);
-
 	   data = createPoint(para, N);
-	   for(dim=0;dim<NDIM;dim++) {
-			/* get colum format */
-			fits_get_coltype(fileIn, id_num[dim], &datatype, &repeat, &width, &status);
-			for(n=0;n<N;n++){
-				fits_read_col(fileIn, datatype, id_num[dim], n+1, 1, 1, NULL, &(data.x[NDIM*n+dim]), &anynul, &status);
-			}
-			if (status) /* print any error messages */ fits_report_error(stderr, status);
-		}
+
+		/* 	read table */
+	   for(dim=0;dim<NDIM;dim++) readColFits(fileIn, id_num[dim], N, data.x, NDIM, dim);
 		if(weighted){
-			fits_get_coltype(fileIn, id_num[NDIM+0], &datatype, &repeat, &width, &status);
-			for(n=0;n<N;n++){
-				fits_read_col(fileIn, datatype, id_num[NDIM+0], n+1, 1, 1, NULL, &(data.w[n]), &anynul, &status);
-			}
-			if (status) /* print any error messages */ fits_report_error(stderr, status);
+			readColFits(fileIn, id_num[NDIM+0], N, data.w, 1, 0);
 		}else{
 			for(n=0;n<N;n++){ data.w[n] = 1.0; };
 		}
 		if(para.corr == GGLENS){
-			fits_get_coltype(fileIn, id_num[NDIM+0], &datatype, &repeat, &width, &status);
-			for(n=0;n<N;n++){
-				fits_read_col(fileIn, datatype, id_num[NDIM+0], n+1, 1, 1, NULL, &(data.zerr[n]), &anynul, &status);
-			}
-			if (status) /* print any error messages */ fits_report_error(stderr, status);
-
-			fits_get_coltype(fileIn, id_num[NDIM+1], &datatype, &repeat, &width, &status);
-			for(n=0;n<N;n++){
-				fits_read_col(fileIn, datatype, id_num[NDIM+1], n+1, 1, 1, NULL, &(data.e1[n]), &anynul, &status);
-			}
-			if (status) /* print any error messages */ fits_report_error(stderr, status);
-
-			fits_get_coltype(fileIn, id_num[NDIM+2], &datatype, &repeat, &width, &status);
-			for(n=0;n<N;n++){
-				fits_read_col(fileIn, datatype, id_num[NDIM+2], n+1, 1, 1, NULL, &(data.e2[n]), &anynul, &status);
-			}
-			if (status) /* print any error messages */ fits_report_error(stderr, status);
-
-			fits_get_coltype(fileIn, id_num[NDIM+3], &datatype, &repeat, &width, &status);
-			for(n=0;n<N;n++){
-				fits_read_col(fileIn, datatype, id_num[NDIM+3], n+1, 1, 1, NULL, &(data.w[n]), &anynul, &status);
-			}
-			if (status) /* print any error messages */ fits_report_error(stderr, status);
+			readColFits(fileIn, id_num[NDIM+0], N, data.zerr, 1, 0);
+			readColFits(fileIn, id_num[NDIM+1], N, data.e1, 1, 0);
+			readColFits(fileIn, id_num[NDIM+2], N, data.e2, 1, 0);
+			readColFits(fileIn, id_num[NDIM+3], N, data.w, 1, 0);
 		}
-
 		fits_close_file(fileIn, &status);
-		if (status) /* print any error messages */ fits_report_error(stderr, status);
 
 		return data;
 	}else{
 
 	   FILE *fileIn = fopenAndCheck(fileInName, "r", para.verbose);
 
-	   /* get size of file and allocate data */
+	   /* 	get size of file and allocate data */
 	   N = 0;
 	   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL)
 	   if(*(line) != '#' && *(line) != '\0' && *(line) != '\n') N++;
 	   rewind(fileIn);
 
 	   if(N < para.size){
-	      /* if no point found in fileIn or if the number of
-	      * points is less than the number of cpu (who knows...)
-	      */
+	      /* 	if no point found in fileIn or if the number of
+	       * 		points is less than the number of cpu (who knows...)
+	       */
 	      if(para.verbose) fprintf(stderr,"\n%s: **WARNING** the number of points is lower than the number of cpus.\n", MYNAME);
 	      //  exit(EXIT_FAILURE);
 	   }
 
 	   data = createPoint(para, N);
 
+		/* 	read table */
 	   n = 0;
 	   while(fgets(line,NFIELD*NCHAR,fileIn) != NULL){
 
@@ -574,13 +552,85 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 		}
 		fclose(fileIn);
 	}
-
 	return data;
 }
 
+void readColFits(fitsfile *fileIn, int id_num, long N, double *x, int NDIM, int dim){
+	/* 	Read one column in fits file. */
 
 
+		int status = 0, datatype, anynul; /* MUST initialize status */
+		long n, repeat, width;
 
+		char tmp_string[1000];
+		short tmp_short;
+		int tmp_int;
+		long tmp_long;
+		float tmp_float;
+		double tmp_double;
+
+		/* 	get colum format */
+		fits_get_coltype(fileIn, id_num, &datatype, &repeat, &width, &status);
+
+		/* 	loop over rows depending on column format*/
+		switch(datatype){
+
+			case TSTRING :
+				for(n=0;n<N;n++){
+					fits_read_col(fileIn, datatype, id_num, n+1, 1, 1, NULL, &tmp_string, &anynul, &status);
+					x[NDIM*n+dim] = atof(tmp_string);
+				}
+				break;
+
+			case TSHORT :
+				for(n=0;n<N;n++){
+					fits_read_col(fileIn, datatype, id_num, n+1, 1, 1, NULL, &tmp_short, &anynul, &status);
+					x[NDIM*n+dim] = (double) tmp_short;
+				}
+				break;
+
+			case TINT :
+				for(n=0;n<N;n++){
+					fits_read_col(fileIn, datatype, id_num, n+1, 1, 1, NULL, &tmp_int, &anynul, &status);
+					x[NDIM*n+dim] = (double) tmp_int;
+				}
+				break;
+
+			case TLONG :
+				for(n=0;n<N;n++){
+					fits_read_col(fileIn, datatype, id_num, n+1, 1, 1, NULL, &tmp_long, &anynul, &status);
+					x[NDIM*n+dim] = (double) tmp_long;
+				}
+				break;
+
+			case TFLOAT :
+				for(n=0;n<N;n++){
+					fits_read_col(fileIn, datatype, id_num, n+1, 1, 1, NULL, &tmp_float, &anynul, &status);
+					x[NDIM*n+dim] = (double) tmp_float;
+				}
+				break;
+
+			case TDOUBLE :
+				for(n=0;n<N;n++){
+					fits_read_col(fileIn, datatype, id_num, n+1, 1, 1, NULL, &tmp_double, &anynul, &status);
+					x[NDIM*n+dim] = tmp_double;
+				}
+				break;
+			default :
+
+	         fprintf(stderr,"\n%s: **ERROR** format \"%d\" (see CFITSIO doc) not recognized in input file. Exiting...\n", MYNAME, datatype);
+
+	         MPI_Finalize();
+	         exit(EXIT_FAILURE);
+				break;
+
+
+		}
+
+		if (status) fits_report_error(stderr, status);
+
+	return;
+}
 
 double distAngCart(const Tree *a, const long *i, const Tree *b, const long *j){
    /* Returns the distance between nodes
