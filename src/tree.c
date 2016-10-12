@@ -259,6 +259,8 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, const 
 	         limitsRight.max[d] = limits->max[d];
 	      }
 
+			/* 	NEW: this allows not to loose data objects that
+			 * 	would have fell outside the random limits */
 			limitsLeft.max[dim] = splitValue;
 			limitsRight.min[dim] = splitValue;
 
