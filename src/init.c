@@ -103,6 +103,7 @@ void initPara(int argc, char **argv, Config *para){
    para->a[2] = Omega_L;
    para->a[3] = c;
 
+
    /* ----------------------------------------------------------------------
    *STEP 1: first loop over arguments. Display help or dump default config file */
    for(i=0;i<argc;i++){
