@@ -130,7 +130,7 @@ Same as above, except that column ids may be replaced by their actual names.
 
 `-fits`: [auto,yes,no]. If "auto", will interpret files with ".fits" or ".fit" as binary fits tables.
 
-### Fits intput filter (to be added to the inpute file name)
+### Fits intput file filters
 
 Example:
 
