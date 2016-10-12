@@ -122,11 +122,19 @@ void numberCount(Config para){
    /*    resample, build masks */
    comment(para, "Resampling...");
    Mask limits;
-   limits.min = (double *)malloc(NDIM*sizeof(double));
-   limits.max = (double *)malloc(NDIM*sizeof(double));
-   setLimits(&data, &limits);
+   if(para.rank == MASTER){
+
+      limits.min = (double *)malloc(NDIM*sizeof(double));
+      limits.max = (double *)malloc(NDIM*sizeof(double));
+      setLimits(&data, &limits);
+   }
 
    resample(&para, &random, dimStart, &mask, &limits, FIRSTCALL);
+
+   if(para.rank == MASTER){
+      free(limits.min);
+      free(limits.max);
+   }
 
    /*    send data */
    comment(para, "sending data...");
@@ -300,14 +308,19 @@ void autoCorr(Config para){
 
 
    Mask limits;
-   limits.min = (double *)malloc(NDIM*sizeof(double));
-   limits.max = (double *)malloc(NDIM*sizeof(double));
-   setLimits(&data, &limits);
-
-   // printf("%f %f\n", limits.min[0], limits.min[1]);
-   // printf("%f %f\n", limits.max[0], limits.max[1]);
+   if(para.rank == MASTER){
+      limits.min = (double *)malloc(NDIM*sizeof(double));
+      limits.max = (double *)malloc(NDIM*sizeof(double));
+      setLimits(&data, &limits);
+   }
 
    resample(&para, &random, dimStart, &mask, &limits, FIRSTCALL);
+
+   if(para.rank == MASTER){
+      free(limits.min);
+      free(limits.max);
+   }
+
 
    /*    send data */
    comment(para, "sending data...");
@@ -726,11 +739,20 @@ void crossCorr(Config para){
    comment(para, "Resampling...");
 
    Mask limits;
-   limits.min = (double *)malloc(NDIM*sizeof(double));
-   limits.max = (double *)malloc(NDIM*sizeof(double));
-   setLimits(&data1, &limits);
+
+   if(para.rank == MASTER){
+
+      limits.min = (double *)malloc(NDIM*sizeof(double));
+      limits.max = (double *)malloc(NDIM*sizeof(double));
+      setLimits(&data1, &limits);
+   }
 
    resample(&para, &random1, dimStart, &mask, &limits, FIRSTCALL);
+
+   if(para.rank == MASTER){
+      free(limits.min);
+      free(limits.max);
+   }
 
    /*    send data */
    comment(para, "sending data...");
@@ -1159,11 +1181,19 @@ void ggCorr(Config para){
    /*  resampling = build masks TODO: check that */
    comment(para, "Resampling...");
    Mask limits;
-   limits.min = (double *)malloc(NDIM*sizeof(double));
-   limits.max = (double *)malloc(NDIM*sizeof(double));
-   setLimits(&source, &limits);
+   if(para.rank == MASTER){
+      limits.min = (double *)malloc(NDIM*sizeof(double));
+      limits.max = (double *)malloc(NDIM*sizeof(double));
+      setLimits(&source, &limits);
+   }
+
 
    resample(&para, &source, dimStart, &mask, &limits, FIRSTCALL);
+
+   if(para.rank == MASTER){
+      free(limits.min);
+      free(limits.max);
+   }
 
    /*    send data. Source catalogue is partitioned among cpus */
    comment(para, "sending data...");

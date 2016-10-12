@@ -457,14 +457,14 @@ Point createPoint(const Config para, long N){
 
 void freePoint(const Config para, Point point){
 
+   free(point.sub_id);
+	free(point.x);
+   free(point.w);
    if(para.corr == GGLENS){
       free(point.zerr);
       free(point.e1);
       free(point.e2);
    }
-   free(point.sub_id);
-	free(point.x);
-   free(point.w);
 
    return;
 }
@@ -786,6 +786,7 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
             MPI_Send(&dim, 1, MPI_INT, rank, BASE+1, MPI_COMM_WORLD);
             MPI_Send(data->x,data->N*NDIM, MPI_DOUBLE, rank, BASE+2, MPI_COMM_WORLD);
             MPI_Send(data->w   , data->N, MPI_DOUBLE, rank, BASE+6, MPI_COMM_WORLD);
+            MPI_Send(data->sub_id   , data->N, MPI_INT, rank, BASE+7, MPI_COMM_WORLD);
             if(para.corr == GGLENS){
                MPI_Send(data->zerr, data->N, MPI_DOUBLE, rank, BASE+3, MPI_COMM_WORLD);
                MPI_Send(data->e1  , data->N, MPI_DOUBLE, rank, BASE+4, MPI_COMM_WORLD);
@@ -802,6 +803,7 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
 
             dataParent->x = (double *)memmove(dataParent->x, data->x, data->N*NDIM*sizeof(double));
             dataParent->w    = (double *)memmove(dataParent->w,    data->w ,   data->N*sizeof(double));
+            dataParent->sub_id  = (int *)memmove(dataParent->sub_id,    data->sub_id ,   data->N*sizeof(int));
             if(para.corr == GGLENS){
                dataParent->zerr = (double *)memmove(dataParent->zerr, data->zerr, data->N*sizeof(double));
                dataParent->e1   = (double *)memmove(dataParent->e1,   data->e1,   data->N*sizeof(double));
@@ -809,6 +811,7 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
             }
             dataParent->x = (double *)realloc(dataParent->x, data->N*NDIM*sizeof(double));
             dataParent->w    = (double *)realloc(dataParent->w,    data->N*sizeof(double));
+            dataParent->sub_id  = (int *)realloc(dataParent->sub_id,    data->N*sizeof(int));
             if(para.corr == GGLENS){
                dataParent->zerr = (double *)realloc(dataParent->zerr, data->N*sizeof(double));
                dataParent->e1   = (double *)realloc(dataParent->e1,   data->N*sizeof(double));
@@ -838,6 +841,10 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
 
       data->w    = (double *)malloc(data->N*sizeof(double));
       MPI_Recv(data->w   , data->N, MPI_DOUBLE, MASTER, BASE+6, MPI_COMM_WORLD, &status);
+
+      data->sub_id    = (int *)malloc(data->N*sizeof(int));
+      MPI_Recv(data->sub_id   , data->N, MPI_INT, MASTER, BASE+7, MPI_COMM_WORLD, &status);
+
 
       if(para.corr == GGLENS){
          data->zerr = (double *)malloc(data->N*sizeof(double));
