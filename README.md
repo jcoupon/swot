@@ -104,7 +104,7 @@ From Athena's documentation:
 
 ### Weighted quantities:
 
-`-weighted`: compute weighted quantities ([X]: column for the weights if available). WARNING: if set, all input files must contain a weight column (including the random samples, put 1.0's if no weight).
+`-weighted [yes,no]`: compute weighted quantities ([X]: column for the weights if available). WARNING: if set, all input files must contain a weight column (including the random samples, put 1.0's if no weight).
 
 
 ### Input format (ascii files)

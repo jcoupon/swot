@@ -1,5 +1,9 @@
 Version history
 
+v 1.4
+- added epsilon on small scale if linear scaling
+- "-weighted" option changed to -weighted [yes,no]
+
 v 1.3
 - added input file fits support
 - added output tree fits support

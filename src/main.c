@@ -3,7 +3,7 @@
 /*
  *    main.c
  *    swot (Super W Of Theta)  mpi version
- *    Jean Coupon (2012-2016)
+ *    Jean Coupon (2012-2017)
  *
  *    Contributions:
  *    - the core algorithm to compute the number of pairs from a kd-tree is
@@ -303,7 +303,6 @@ void autoCorr(Config para){
 
    /*    resample, build masks */
    comment(para, "Resampling...");
-
 
    Mask limits;
    if(para.rank == MASTER){

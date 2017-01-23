@@ -111,7 +111,7 @@ void initPara(int argc, char **argv, Config *para){
          if(para->verbose){
             fprintf(stderr,"\n\n\
                      S W O T\n\n\
-       (Super W Of Theta) MPI version 1.3\n\n\
+       (Super W Of Theta) MPI version 1.4\n\n\
 Program to compute two-point correlation functions.\n\
 Usage: %s -c configFile [options]: run the program\n\
        %s -d: display a default configuration file\n\
@@ -143,6 +143,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          printf("corr           auto\t # Type of correlation:\n");
          printf("                   \t # [auto,cross,gglens,auto_wp,cross_wp,auto_3D,cross_3D,number]\n");
          printf("est            ls\t # Estimator [ls,nat,ham,peebles]\n");
+         printf("weighted       yes\t # Weighted estimator [yes,no] (weigth column number must be added in column description)\n");
          printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
          printf("nbins          %d\t # Number of bins\n", para->nbins);
          printf("nbins_pi       %d\t # Number of bins for pi (for wp)\n", para->nbins_pi);
@@ -281,7 +282,21 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       }
       para->min = log(para->min);
       para->max = log(para->max);
+   }else{
+      /*
+       *    A small epsilon is added to para->min to prevent
+       *    single objects to be accounted twice
+       *    TODO: add an option to disable this option in case two
+       *    catalogues must be cross-matched on very small scale
+       */
+
+      if(para->proj == THETA){
+         para->min = MAX(1.e-6, para->min);
+      }else{
+         para->min = MAX(EPS*2.0, para->min);
+      }
    }
+
    para->Delta = (para->max - para->min)/(double)para->nbins;
 
    if(para->err == SUBSAMPLE && para->corr != NUMBER){
@@ -444,7 +459,11 @@ void setPara(char *field, char *arg, Config *para){
    checkArg(field,arg,para);
    para->pi_max  = atof(arg);
 }else if(!strcmp(field,"weighted")){
-   para->weighted = 1;
+   checkArg(field,arg,para);
+   if(!strcmp(arg,"yes")) para->weighted = 1;
+   else para->weighted = 0;
+//else if(!strcmp(field,"weighted")){
+//   para->weighted = 1;
 }else if(!strcmp(field,"out") || !strcmp(field,"o")){
    checkArg(field,arg,para);
    strcpy(para->fileOutName,arg);

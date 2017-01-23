@@ -314,6 +314,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
       }
    }
 
+
    if((tree1 == tree2 && i > j) || j < 0) return result;
 
    deltaTheta = para->distAng(tree1, &i, tree2, &j);
@@ -353,6 +354,7 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
       /*    Note: tree->N[i] is the weighted sum of objects so there's no
        *    need to keep track of the sum of the weights, which is simply NN.
        */
+      // DEBUGGING
       if(para->log) d = log(d);
       k = floor((d - para->min)/para->Delta);
       if(0 <= k && k < para->nbins){
@@ -377,6 +379,8 @@ Result Npairs(const Config *para, const Tree *tree1, const long i, const Tree *t
          result.meanR[k] *= 2.0;
       }
    }
+
+
 
    return result;
 }
