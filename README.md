@@ -175,6 +175,9 @@ See also http://heasarc.gsfc.nasa.gov/docs/software/fitsio/filters.html.
 
 `printTreeAndExit`: same as above but exists after.
 
+### verbose
+
+`-silent yes`: shuts off all messages.
 
 ## Memory usage
 
