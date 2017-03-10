@@ -111,7 +111,7 @@ void initPara(int argc, char **argv, Config *para){
          if(para->verbose){
             fprintf(stderr,"\n\n\
                      S W O T\n\n\
-       (Super W Of Theta) MPI version 1.4\n\n\
+       (Super W Of Theta) MPI version 1.4.1\n\n\
 Program to compute two-point correlation functions.\n\
 Usage: %s -c configFile [options]: run the program\n\
        %s -d: display a default configuration file\n\
@@ -177,6 +177,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          printf("printTree      no\t # Output tree in \"out\".data[1,2]_tree.[ascii,fits]\n");
          printf("printTreeAndExit no\t # Same as above but exits after\n");
          printf("printSamples   no\t # Ouput samples in \"out\".samples\n");
+         printf("silent         no\t # Shut off all stdout messages [yes,no]\n");
          exit(EXIT_FAILURE);
       }
    }
@@ -496,6 +497,12 @@ void setPara(char *field, char *arg, Config *para){
    checkArg(field,arg,para);
    if(strcmp(arg,"no")){
       strcpy(para->RROutFileName, arg);
+   }
+}else if(!strcmp(field,"silent")){
+   checkArg(field,arg,para);
+   if(para->rank == MASTER){
+      if(!strcmp(arg,"yes")) para->verbose = 0;
+      else para->verbose = 1;
    }
 }else if(!strcmp(field,"c")){
    /* do nothing, this is the option for the config file */

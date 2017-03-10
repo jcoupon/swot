@@ -1,5 +1,8 @@
 Version history
 
+v 1.4.1
+- added -silent yes/no option
+
 v 1.4
 - added epsilon on small scale if linear scaling
 - "-weighted" option changed to -weighted [yes,no]

@@ -1,7 +1,7 @@
 # Makefile for swot
 
 # Where cfitsio library is installed
-CFITSIO =  #/usr/local
+CFITSIO =  # /usr/cfitsio
 
 
 # Where GSL library is installed

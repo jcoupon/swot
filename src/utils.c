@@ -42,7 +42,6 @@ double drdz(double x, void * params){
 }
 
 
-
 FILE *fopenAndCheck(const char *fileName, char *mode, int verbose){
    /* Checks if fileName exists and opens it. Exits otherwise. */
    FILE *fileTmp = fopen(fileName, mode);
