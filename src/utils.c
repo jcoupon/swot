@@ -493,19 +493,30 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 		int status = 0, datatype, id_num[NIDSMAX];
 
 		fits_open_table(&fileIn, fileInName, READONLY, &status);
-		if (status) fits_report_error(stderr, status);
+		if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 
 		/* 	convert column names into column numbers if required */
       for(j=0;j<NIDSMAX;j++) {
 			id_num[j] = atoi(id[j]);
 			if(id_num[j] == 0){ /* 	if input column name is a string it will return "0" */
 				fits_get_colnum(fileIn, CASEINSEN, id[j], &(id_num[j]), &status);
-				if (status) fits_report_error(stderr, status);
+            if (status){
+               fits_report_error(stderr, status);
+               exit(EXIT_FAILURE);
+            }
 			}
 		}
 
 	   /* 	get size of file and allocate data */
 		fits_get_num_rows(fileIn, &N, &status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
+
 	   data = createPoint(para, N);
 
 		/* 	read table */
@@ -522,6 +533,11 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 			readColFits(fileIn, id_num[NDIM+3], N, data.w, 1, 0);
 		}
 		fits_close_file(fileIn, &status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
+
 
 		return data;
 	}else{
@@ -597,6 +613,11 @@ void readColFits(fitsfile *fileIn, int id_num, long N, double *x, int NDIM, int 
 
 		/* 	get colum format */
 		fits_get_coltype(fileIn, id_num, &datatype, &repeat, &width, &status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
+
 
 		/* 	loop over rows depending on column format*/
 		switch(datatype){
@@ -653,7 +674,10 @@ void readColFits(fitsfile *fileIn, int id_num, long N, double *x, int NDIM, int 
 
 		}
 
-		if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 
 	return;
 }

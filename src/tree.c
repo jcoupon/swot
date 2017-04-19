@@ -369,10 +369,17 @@ void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i
 
 		fits_create_file(&fileOut, fileOutName, &status);
    	/* if error occured, print out error message */
-   	if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
+
 
 		fits_create_tbl(fileOut, BINARY_TBL, 0, tfields, ttype, tform, tunit, extname, &status);
-   	if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 	}
 
    if(tree.N[i] > NLeaf){
@@ -381,22 +388,39 @@ void printTreeFits(const Config para, char *fileOutName, const Tree tree, long i
    }else{
 
 		for(dim=0;dim<NDIM;dim++) fits_write_col(fileOut, TDOUBLE, dim+1, n, 1, 1, &(tree.point.x[NDIM*i+dim]), &status);
-		if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 
 		fits_write_col(fileOut, TBYTE, NDIM+1, n, 1, para.nsamples, &(tree.w[para.nsamples*i]), &status);
-		if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 
 		fits_write_col(fileOut, TINT, NDIM+2, n, 1, 1, (void *)&(tree.point.sub_id[i]), &status);
-		if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 
 		fits_write_col(fileOut, TINT, NDIM+3, n, 1, 1, (void *)&(para.rank), &status);
-		if (status) fits_report_error(stderr, status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
 
 		n++;
 	}
 
    if(firstCall){
 		fits_close_file(fileOut, &status);
+      if (status){
+         fits_report_error(stderr, status);
+         exit(EXIT_FAILURE);
+      }
+
 		for(dim=0;dim<NDIM;dim++){ free(ttype[dim]);};
 		free(ttype);
 		free(tform[NDIM]);

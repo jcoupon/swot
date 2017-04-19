@@ -111,7 +111,7 @@ void initPara(int argc, char **argv, Config *para){
          if(para->verbose){
             fprintf(stderr,"\n\n\
                      S W O T\n\n\
-       (Super W Of Theta) MPI version 1.4.1\n\n\
+       (Super W Of Theta) MPI version 1.4.2\n\n\
 Program to compute two-point correlation functions.\n\
 Usage: %s -c configFile [options]: run the program\n\
        %s -d: display a default configuration file\n\
@@ -143,7 +143,7 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          printf("corr           auto\t # Type of correlation:\n");
          printf("                   \t # [auto,cross,gglens,auto_wp,cross_wp,auto_3D,cross_3D,number]\n");
          printf("est            ls\t # Estimator [ls,nat,ham,peebles]\n");
-         printf("weighted       yes\t # Weighted estimator [yes,no] (weigth column number must be added in column description)\n");
+         printf("weighted       no\t # Weighted estimator [yes,no] (weigth column number must be added in column description)\n");
          printf("range          %g,%g\t # Correlation range. Dimension same as \"proj\":\n", para->min, para->max);
          printf("nbins          %d\t # Number of bins\n", para->nbins);
          printf("nbins_pi       %d\t # Number of bins for pi (for wp)\n", para->nbins_pi);
@@ -196,11 +196,11 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
          fclose(configFile);
       }
    }
-   if(noconfigFile){
-      if(para->verbose) fprintf(stderr,"\n%s: **ERROR** config file not found. Exiting...\n", MYNAME);
-      MPI_Finalize();
-      exit(EXIT_FAILURE);
-   }
+   //if(noconfigFile){
+   //   if(para->verbose) fprintf(stderr,"\n%s: **ERROR** config file not found. Exiting...\n", MYNAME);
+   //   MPI_Finalize();
+   //   exit(EXIT_FAILURE);
+   //}
 
    /* ----------------------------------------------------------------------
     * STEP 3: third loop over arguments. Read the command line options
