@@ -48,7 +48,6 @@ FILE *fopenAndCheck(const char *fileName, char *mode, int verbose){
    if (fileTmp == NULL){
       if(verbose) printf("%s: **ERROR** %s not found. Exiting...\n",MYNAME,fileName);
       //TO DO proper error display
-
       exit(EXIT_FAILURE);
    }
    return fileTmp;
@@ -496,8 +495,6 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 		fits_open_table(&fileIn, fileInName, READONLY, &status);
 		if (status){
          fits_report_error(stderr, status);
-         MPI_Finalize();
-
          exit(EXIT_FAILURE);
       }
 
@@ -508,7 +505,6 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 				fits_get_colnum(fileIn, CASEINSEN, id[j], &(id_num[j]), &status);
             if (status){
                fits_report_error(stderr, status);
-               MPI_Finalize();
                exit(EXIT_FAILURE);
             }
 			}
@@ -518,7 +514,6 @@ Point readCat(const Config para, char *fileInName, char *id[NIDSMAX], int weight
 		fits_get_num_rows(fileIn, &N, &status);
       if (status){
          fits_report_error(stderr, status);
-         MPI_Finalize();
          exit(EXIT_FAILURE);
       }
 
@@ -620,7 +615,6 @@ void readColFits(fitsfile *fileIn, int id_num, long N, double *x, int NDIM, int 
 		fits_get_coltype(fileIn, id_num, &datatype, &repeat, &width, &status);
       if (status){
          fits_report_error(stderr, status);
-         MPI_Finalize();
          exit(EXIT_FAILURE);
       }
 
@@ -682,8 +676,6 @@ void readColFits(fitsfile *fileIn, int id_num, long N, double *x, int NDIM, int 
 
       if (status){
          fits_report_error(stderr, status);
-         MPI_Finalize();
-
          exit(EXIT_FAILURE);
       }
 
