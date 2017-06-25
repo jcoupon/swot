@@ -310,7 +310,6 @@ void resample(const Config *para, const Point *data, int dim, Mask *mask, const 
 	   MPI_Bcast(mask->min, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
 	   MPI_Bcast(mask->max, ndim*para->nsub, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
 	   MPI_Bcast(mask->w,   para->nsamples*para->nsub, MPI_UNSIGNED_CHAR, MASTER, MPI_COMM_WORLD);
-
 	}
 
 return;

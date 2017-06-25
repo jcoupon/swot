@@ -1175,6 +1175,7 @@ void ggCorr(Config para){
       if(para.verbose){fflush(stderr); fprintf(stderr,"(%zd lenses found).\n", lens.N);}
    }
 
+
    /*  resampling = build masks TODO: check that */
    comment(para, "Resampling...");
    Mask limits;
@@ -1183,7 +1184,6 @@ void ggCorr(Config para){
       limits.max = (double *)malloc(NDIM*sizeof(double));
       setLimits(&source, &limits);
    }
-
 
    resample(&para, &source, dimStart, &mask, &limits, FIRSTCALL);
 
@@ -1196,7 +1196,12 @@ void ggCorr(Config para){
    comment(para, "sending data...");
 
    comData(para, &source, para.size, dimStart, FIRSTCALL);
+
+
+   //comData(para, &source, 0, dimStart, FIRSTCALL);
+
    comData(para, &lens  , 0, dimStart, FIRSTCALL);
+
 
    /*    grow trees */
    comment(para, "building trees...");

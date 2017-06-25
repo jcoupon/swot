@@ -341,7 +341,8 @@ void copyPoint(const Config para, Point a, long i, Point b, long j){
    long dim;
 
    for(dim=0;dim<NDIM;dim++) a.x[NDIM*i+dim] = b.x[NDIM*j+dim];
-   a.w[i]    = b.w[j];
+   a.w[i] = b.w[j];
+   a.sub_id[i] = b.sub_id[j];
    if(para.corr == GGLENS){
       a.zerr[i] = b.zerr[j];
       a.e1[i]   = b.e1[j];
@@ -402,6 +403,7 @@ void copyPointAddress(const Config para, Point *a, const Point b, long shift){
 
    a->x = b.x + shift*NDIM;
    a->w = b.w + shift;
+   a->sub_id = b.sub_id + shift;
    if(para.corr == GGLENS){
       a->zerr = b.zerr + shift;
       a->e1   = b.e1   + shift;
@@ -417,6 +419,7 @@ void swapPoint(const Config para, Point point,long i, long j){
 
    long dim;
    double tmp;
+   int tmpInt;
 
    for(dim=0;dim<NDIM;dim++){
       tmp                 = point.x[NDIM*i+dim];
@@ -426,6 +429,11 @@ void swapPoint(const Config para, Point point,long i, long j){
    tmp           = point.w[i];
    point.w[i]    = point.w[j];
    point.w[j]    = tmp;
+
+   tmpInt        = point.sub_id[i];
+   point.sub_id[i]    = point.sub_id[j];
+   point.sub_id[j]    = tmpInt;
+
    if(para.corr == GGLENS){
       tmp           = point.zerr[i];
       point.zerr[i] = point.zerr[j];
@@ -809,7 +817,9 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
             comData(para, &dataRight, (Ncpu-1)/2, dim, 0);
             break;
          }
+
       }else{
+
          if(rank != MASTER){
             MPI_Send(&data->N, 1, MPI_LONG, rank, BASE+0, MPI_COMM_WORLD);
             MPI_Send(&dim, 1, MPI_INT, rank, BASE+1, MPI_COMM_WORLD);
@@ -832,12 +842,16 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
 
             dataParent->x = (double *)memmove(dataParent->x, data->x, data->N*NDIM*sizeof(double));
             dataParent->w    = (double *)memmove(dataParent->w,    data->w ,   data->N*sizeof(double));
-            dataParent->sub_id  = (int *)memmove(dataParent->sub_id,    data->sub_id ,   data->N*sizeof(int));
+            dataParent->sub_id  = (int *)memmove(dataParent->sub_id, data->sub_id , data->N*sizeof(int));
+
             if(para.corr == GGLENS){
                dataParent->zerr = (double *)memmove(dataParent->zerr, data->zerr, data->N*sizeof(double));
                dataParent->e1   = (double *)memmove(dataParent->e1,   data->e1,   data->N*sizeof(double));
                dataParent->e2   = (double *)memmove(dataParent->e2,   data->e2,   data->N*sizeof(double));
             }
+
+
+
             dataParent->x = (double *)realloc(dataParent->x, data->N*NDIM*sizeof(double));
             dataParent->w    = (double *)realloc(dataParent->w,    data->N*sizeof(double));
             dataParent->sub_id  = (int *)realloc(dataParent->sub_id,    data->N*sizeof(int));
@@ -846,6 +860,8 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
                dataParent->e1   = (double *)realloc(dataParent->e1,   data->N*sizeof(double));
                dataParent->e2   = (double *)realloc(dataParent->e2,   data->N*sizeof(double));
             }
+
+
 
             /*    copy the new number of points and the dim
              *    along which they are sorted
@@ -863,6 +879,12 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
       MPI_Status status;
 
       MPI_Recv(&data->N, 1, MPI_LONG, MASTER, BASE+0, MPI_COMM_WORLD, &status);
+
+      //if (status){
+      //   printf("status = %l\n", status);
+      //   exit(EXIT_FAILURE);
+      //}
+
       MPI_Recv(&dim, 1, MPI_INT, MASTER, BASE+1, MPI_COMM_WORLD, &status);
 
       data->x = (double *)malloc(data->N*NDIM*sizeof(double));
@@ -874,14 +896,20 @@ void comData(const Config para, Point *data, long Ncpu, int dim, int firstCall){
       data->sub_id    = (int *)malloc(data->N*sizeof(int));
       MPI_Recv(data->sub_id   , data->N, MPI_INT, MASTER, BASE+7, MPI_COMM_WORLD, &status);
 
-
       if(para.corr == GGLENS){
          data->zerr = (double *)malloc(data->N*sizeof(double));
          data->e1   = (double *)malloc(data->N*sizeof(double));
          data->e2   = (double *)malloc(data->N*sizeof(double));
+
          MPI_Recv(data->zerr, data->N, MPI_DOUBLE, MASTER, BASE+3, MPI_COMM_WORLD, &status);
+
+
          MPI_Recv(data->e1  , data->N, MPI_DOUBLE, MASTER, BASE+4, MPI_COMM_WORLD, &status);
+
          MPI_Recv(data->e2  , data->N, MPI_DOUBLE, MASTER, BASE+5, MPI_COMM_WORLD, &status);
+
+
+
       }
    }
 
