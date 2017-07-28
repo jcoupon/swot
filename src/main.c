@@ -199,7 +199,7 @@ void numberCount(Config para){
       switch(para.err){
          case JACKKNIFE: norm = (double)(para.nsamples - 1)/(double)(para.nsamples); break;
          case BOOTSTRAP: norm = 1.0/(double)(para.nsamples - 1); break;
-         case SUBSAMPLE: norm = (double)(para.nsamples - 1); break;
+         case SUBSAMPLE: norm = 1.0/(double)(para.nsamples); break;
       }
 
       for(i=0;i<para.nbins;i++){
@@ -211,12 +211,16 @@ void numberCount(Config para){
             for(l=0;l<para.nsamples;l++){
                //norm_N = N.N1[0]/N.N1[l+1];
                norm_N = 1.0;
-               Nmean[i] += norm_N  * N.NN[para.nbins*(l+1)+i]/(double)para.nsamples;
+               Nmean[i] += norm_N * N.NN[para.nbins*(l+1)+i]/(double)para.nsamples;
             }
             for(l=0;l<para.nsamples;l++){ /* dispersion */
                err_r[i] += SQUARE(Nmean[i]-norm_N*N.NN[para.nbins*(l+1)+i]);
             }
             err_r[i] = sqrt(norm*err_r[i]);
+            if (para.err == SUBSAMPLE){
+               err_r[i] = err_r[i]*(double)(para.nsamples);
+            }
+
          }
 
          /*    2. poisson error ~1/N */

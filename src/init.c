@@ -255,6 +255,10 @@ in the input catalogues must be in decimal degrees.\n", MYNAME, MYNAME);
       para->nsamples = para->nsub;
       if(para->verbose) fprintf(stderr,"\n%s: **WARNING** nsamples set to nsub for jackknife.\n", MYNAME);
    }
+   if(para->err == SUBSAMPLE && para->nsamples != para->nsub ){
+      para->nsamples = para->nsub;
+      if(para->verbose) fprintf(stderr,"\n%s: **WARNING** nsamples set to nsub for subsample.\n", MYNAME);
+   }
    if(para->nsamples < para->nsub ){
       if(para->verbose) fprintf(stderr,"\n%s: **WARNING** nsamples is < nsub.\n", MYNAME);
    }
