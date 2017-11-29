@@ -540,8 +540,27 @@ void autoCorr(Config para){
       }
       switch(para.corr){
          /* If auto correlation  */
-         case AUTO:  case AUTO_3D:
-            fprintf(fileOut, "#  R            w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+         case AUTO:
+            fprintf(fileOut, "#  theta          w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            /*
+            if(para.proj == COMO){
+               fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            }else if(para.proj == PHYS){
+               fprintf(fileOut, "#  R(physical)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            }else{
+               fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
+            }
+            */
+            for(i=0;i<para.nbins;i++){
+               fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
+                  R[i], wTheta(para, para.estimator, DD, RR, DR, DR, i, 0),
+                  err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
+                  DD.NN[i], DR.NN[i], RR.NN[i],  DD.N1[0],  RR.N1[0]);
+            }
+            break;
+
+         case AUTO_3D:
+            fprintf(fileOut, "#  R            xi       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
             /*
             if(para.proj == COMO){
                fprintf(fileOut, "#  R(comoving)  w       err(resamp) err(resamp-poisson) err(poisson)      <R>                DD                DR                RR      Ndata             Nrandom\n");
@@ -999,8 +1018,8 @@ void crossCorr(Config para){
       }
       switch(para.corr){
          /*    If cross correlation */
-         case CROSS: case CROSS_3D:
-            fprintf(fileOut, "#  R            w       err(resamp) err(resamp-poisson) err(poisson)               <R>              D1D2             D1R2             D2R1          R1R2       Ndata1     Nrandom1   Ndata2     Nrandom2\n");
+         case CROSS:
+            fprintf(fileOut, "#  theta        w       err(resamp) err(resamp-poisson) err(poisson)   <R>              D1D2              D1R2              D2R1              R1R2              Ndata1            Nrandom1     Ndata2            Nrandom2\n");
 
             /*
             if(para.proj == COMO){
@@ -1017,6 +1036,17 @@ void crossCorr(Config para){
                err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
                D1D2.NN[i], D1R2.NN[i], D2R1.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
             }
+            break;
+
+         case CROSS_3D:
+            fprintf(fileOut, "#  R            xi      err(resamp) err(resamp-poisson) err(poisson)   <R>              D1D2              D1R2              D2R1              R1R2              Ndata1            Nrandom1     Ndata2            Nrandom2\n");
+            for(i=0;i<para.nbins;i++){
+               fprintf(fileOut, "%12.7f %12.7f %12.7f %12.7f %12.7f %12.7f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f %17.5f\n",
+               R[i], wTheta(para, para.estimator, D1D2, R1R2, D1R2, D2R1, i, 0),
+               err_r[i], sqrt(MAX(0.0, SQUARE(err_r[i])-SQUARE(err_p[i]))), err_p[i], meanR[i],
+               D1D2.NN[i], D1R2.NN[i], D2R1.NN[i], R1R2.NN[i],  D1D2.N1[0],  R1R2.N1[0],  D1D2.N2[0],  R1R2.N2[0]);
+            }
+
             break;
          /*    If wp(rp) cross correlation */
          case CROSS_WP:
