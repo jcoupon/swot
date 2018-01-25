@@ -111,7 +111,7 @@ void initPara(int argc, char **argv, Config *para){
          if(para->verbose){
             fprintf(stderr,"\n\n\
                      S W O T\n\n\
-       (Super W Of Theta) MPI version 1.4.3\n\n\
+       (Super W Of Theta) MPI version 1.4.4\n\n\
 Program to compute two-point correlation functions.\n\
 Usage: %s -c configFile [options]: run the program\n\
        %s -d: display a default configuration file\n\

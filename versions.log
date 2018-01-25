@@ -1,8 +1,10 @@
 Version history
 
+v 1.4.4
+- small scales signal in cross correlation fixed
+
 v 1.4.3
 - corrected bug in gglens
-
 
 v 1.4.2
 - weighted no in default config file

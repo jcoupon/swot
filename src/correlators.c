@@ -28,29 +28,38 @@ double wTheta(const Config para, int estimator, Result D1D2, Result R1R2, Result
 
 
    double result = 0.0;
-
-   if(D1D2.NN[para.nbins*l+i] > 0
-      && D1R2.NN[para.nbins*l+i] > 0
-      && D2R1.NN[para.nbins*l+i] > 0
-      && R1R2.NN[para.nbins*l+i] > 0){
-         switch(estimator){
-            case LS:  /*   Landy and Szalay */
-            result  =  Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
-            result += -Norm2*D1R2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
-            result += -Norm3*D2R1.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] + 1.0;
+      switch(estimator){
+         case LS:  /*   Landy and Szalay */
+            if(D1D2.NN[para.nbins*l+i] > 0
+            && D1R2.NN[para.nbins*l+i] > 0
+            && D2R1.NN[para.nbins*l+i] > 0
+            && R1R2.NN[para.nbins*l+i] > 0){
+               result  =  Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
+               result += -Norm2*D1R2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i];
+               result += -Norm3*D2R1.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] + 1.0;
+            }
             break;
-            case NAT: /*   Natural */
-            result = Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] - 1.0;
+         case NAT: /*   Natural */
+            if(D1D2.NN[para.nbins*l+i] > 0
+            && R1R2.NN[para.nbins*l+i] > 0){
+               result = Norm1*D1D2.NN[para.nbins*l+i]/R1R2.NN[para.nbins*l+i] - 1.0;
+            }
             break;
-            case HAM: /*   Hamilton */
-            result = Norm4*D1D2.NN[para.nbins*l+i]*R1R2.NN[para.nbins*l+i]/(D1R2.NN[para.nbins*l+i]*D2R1.NN[para.nbins*l+i]) - 1.0;
+         case HAM: /*   Hamilton */
+            if(D1D2.NN[para.nbins*l+i] > 0
+            && D1R2.NN[para.nbins*l+i] > 0
+            && D2R1.NN[para.nbins*l+i] > 0
+            && R1R2.NN[para.nbins*l+i] > 0){
+               result = Norm4*D1D2.NN[para.nbins*l+i]*R1R2.NN[para.nbins*l+i]/(D1R2.NN[para.nbins*l+i]*D2R1.NN[para.nbins*l+i]) - 1.0;
+            }
             break;
-            case PEEBLES: /*  Peebles */
-            result = Norm5*D1D2.NN[para.nbins*l+i]/D1R2.NN[para.nbins*l+i] - 1.0;
+         case PEEBLES: /*  Peebles */
+            if(D1D2.NN[para.nbins*l+i] > 0
+            && D1R2.NN[para.nbins*l+i] > 0){
+               result = Norm5*D1D2.NN[para.nbins*l+i]/D1R2.NN[para.nbins*l+i] - 1.0;
+            }
             break;
-         }
       }
-
       return result;
    }
 
@@ -64,13 +73,13 @@ double wp(const Config para, int estimator, Result D1D2, Result R1R2, Result D1R
    // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
    // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
    // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+   // double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+   // double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
    double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]))/(D1D2.N1[l]*(D1D2.N2[l]));
    double Norm2 = (R1R2.N1[l])/D1D2.N1[l];
    double Norm3 = (R1R2.N2[l])/D1D2.N2[l];
-
-
-   double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
-   double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
+   double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/(R1R2.N2[l]*D1D2.N2[l]);
+   double Norm5 = R1R2.N1[l]/D1D2.N2[l];
 
    double result = 0.0, sum = 0.0;
 
@@ -152,37 +161,49 @@ double xis(const Config para, int estimator, Result D1D2, Result R1R2, Result D1
    // double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]-1))/(D1D2.N1[l]*(D1D2.N2[l]-1));
    // double Norm2 = (R1R2.N2[l]-1)/D1D2.N1[l];
    // double Norm3 = (R1R2.N1[l]-1)/D1D2.N2[l];
+   // double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
+   // double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
    double Norm1 = (R1R2.N1[l]*(R1R2.N2[l]))/(D1D2.N1[l]*(D1D2.N2[l]));
    double Norm2 = (R1R2.N1[l])/D1D2.N1[l];
    double Norm3 = (R1R2.N2[l])/D1D2.N2[l];
+   double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/(R1R2.N2[l]*D1D2.N2[l]);
+   double Norm5 = R1R2.N1[l]/D1D2.N2[l];
 
-   double Norm4 = (D1D2.N2[l]*R1R2.N2[l])/((R1R2.N2[l]-1)*(D1D2.N2[l]-1));
-   double Norm5 = R1R2.N1[l]/(D1D2.N2[l]-1.0);
 
    double result = 0.0;
-
-   if(D1D2.NN_s[para.nbins*l+i] > 0
-      && D1R2.NN_s[para.nbins*l+i] > 0
-      && D2R1.NN_s[para.nbins*l+i] > 0
-      && R1R2.NN_s[para.nbins*l+i] > 0){
-
-      switch(estimator){
-         case LS:  /*   Landy and Szalay */
-         result  =  Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
-         result += -Norm2*D1R2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
-         result += -Norm3*D2R1.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] + 1.0;
+   switch(estimator){
+      case LS:  /*   Landy and Szalay */
+         if(D1D2.NN_s[para.nbins*l+i] > 0
+         && D1R2.NN_s[para.nbins*l+i] > 0
+         && D2R1.NN_s[para.nbins*l+i] > 0
+         && R1R2.NN_s[para.nbins*l+i] > 0){
+            result  =  Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
+            result += -Norm2*D1R2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i];
+            result += -Norm3*D2R1.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] + 1.0;
+         }
          break;
-         case NAT: /*   Natural */
-         result = Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] - 1.0;
+      case NAT: /*   Natural */
+         if(D1D2.NN_s[para.nbins*l+i] > 0
+         && R1R2.NN_s[para.nbins*l+i] > 0){
+            result = Norm1*D1D2.NN_s[para.nbins*l+i]/R1R2.NN_s[para.nbins*l+i] - 1.0;
+         }
          break;
-         case HAM: /*   Hamilton */
-         result = Norm4*D1D2.NN_s[para.nbins*l+i]*R1R2.NN_s[para.nbins*l+i]/(D1R2.NN_s[para.nbins*l+i]*D2R1.NN_s[para.nbins*l+i]) - 1.0;
+      case HAM: /*   Hamilton */
+         if(D1D2.NN_s[para.nbins*l+i] > 0
+         && D1R2.NN_s[para.nbins*l+i] > 0
+         && D2R1.NN_s[para.nbins*l+i] > 0
+         && R1R2.NN_s[para.nbins*l+i] > 0){
+            result = Norm4*D1D2.NN_s[para.nbins*l+i]*R1R2.NN_s[para.nbins*l+i]/(D1R2.NN_s[para.nbins*l+i]*D2R1.NN_s[para.nbins*l+i]) - 1.0;
+         }
          break;
-         case PEEBLES: /*  Peebles */
-         result = Norm5*D1D2.NN_s[para.nbins*l+i]/D1R2.NN_s[para.nbins*l+i] - 1.0;
+      case PEEBLES: /*  Peebles */
+         if(D1D2.NN_s[para.nbins*l+i] > 0
+         && D1R2.NN_s[para.nbins*l+i] > 0){
+            result = Norm5*D1D2.NN_s[para.nbins*l+i]/D1R2.NN_s[para.nbins*l+i] - 1.0;
+         }
          break;
-      }
    }
+
 
    return result;
 }
